@@ -3,17 +3,6 @@ enum MathOperation {
   indirect case Sum(MathOperation, MathOperation)
   indirect case Mul(MathOperation, MathOperation)
   
-  func name() -> String {
-    switch self {
-      case .Value(_):
-        return "Value"
-      case .Sum(_, _):
-        return "Sum"
-      case .Mul(_, _):
-        return "Mul"
-      }
-  }
-  
   func solve() -> Int {
     switch self {
     case .Value(let value):
@@ -26,6 +15,23 @@ enum MathOperation {
   }
 }
 
+protocol HasName {
+  func name() -> String;
+}
+
+extension MathOperation : HasName
+{
+  func name() -> String {
+    switch self {
+      case .Value(_):
+        return "Value"
+      case .Sum(_, _):
+        return "Sum"
+      case .Mul(_, _):
+        return "Mul"
+      }
+  }
+}
 
 let op = MathOperation.Sum(MathOperation.Value(10),
                            MathOperation.Mul(MathOperation.Value(20),

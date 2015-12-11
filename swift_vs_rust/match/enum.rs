@@ -1,11 +1,11 @@
-trait HasName {
-    fn name(&self) -> &'static str;
-}
-
 enum MathOperation {
     Value(i32),
     Sum(Box<MathOperation>, Box<MathOperation>),
     Mul(Box<MathOperation>, Box<MathOperation>)
+}
+
+trait HasName {
+    fn name(&self) -> &'static str;
 }
 
 impl HasName for MathOperation {
