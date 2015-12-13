@@ -163,14 +163,23 @@ impl LineRasterizer {
     }
 }
 
+impl Iterator for LineRasterizer
+{
+    type Item = Vec3;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_point()
+    }
+}
+
 fn main() {
     let mut canvas = Pixmap::new(300, 300, 0);
 
     let a = Vec3 { x: 0, y:0, z:0 };
     let b = Vec3 { x: 10, y: 5, z: -4 };
 
-    let mut rasterizer = LineRasterizer::new(a, b);
-    while let Some(point) = rasterizer.next_point() {
+    let rasterizer = LineRasterizer::new(a, b);
+    for point in rasterizer {
         let color = std::u32::MAX;
         canvas.set_pixel(point.x as usize, point.y as usize, color);
         println!("point: x: {}, y: {}, z: {}, color: #{:X}", point.x, point.y, point.z, color);
