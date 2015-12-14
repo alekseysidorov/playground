@@ -197,7 +197,7 @@ fn main() {
         println!("Rust: point: x: {}, y: {}, z: {}, color: #{:X}", point.x, point.y, point.z, color);
     }
 
-    for _ in 0..100000 {
+    for _ in 0..1000000 {
         test_code(&mut canvas)
     }
 }

@@ -177,7 +177,6 @@ for point in raster {
     print("Swift: point: x: \(point.x), y: \(point.y), z:\(point.z), color: #\(color)")
 }
 
-
-for _ in 0..<100000 {
+for _ in 0..<1000000 {
     testCode(canvas)
 }
