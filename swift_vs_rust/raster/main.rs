@@ -173,6 +173,17 @@ impl Iterator for LineRasterizer
     }
 }
 
+fn test_code(canvas: &mut Canvas) {
+    let a = Vec3 { x: 0, y:0, z:0 };
+    let b = Vec3 { x: 50, y: 55, z: -20 };
+
+    let rasterizer = LineRasterizer::new(a, b);
+    for point in rasterizer {
+        let color = std::u32::MAX;
+        canvas.set_pixel(point.x as usize, point.y as usize, color);
+    }
+}
+
 fn main() {
     let mut canvas = Pixmap::new(300, 300, 0);
 
@@ -184,5 +195,9 @@ fn main() {
         let color = std::u32::MAX;
         canvas.set_pixel(point.x as usize, point.y as usize, color);
         println!("Rust: point: x: {}, y: {}, z: {}, color: #{:X}", point.x, point.y, point.z, color);
+    }
+
+    for _ in 0..100000 {
+        test_code(&mut canvas)
     }
 }
