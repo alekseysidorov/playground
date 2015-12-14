@@ -1,5 +1,6 @@
 use std::ops::{ Index, IndexMut };
 
+#[allow(dead_code)]
 struct GenericPixmap<T> {
     w: usize,
     h: usize,
@@ -182,6 +183,6 @@ fn main() {
     for point in rasterizer {
         let color = std::u32::MAX;
         canvas.set_pixel(point.x as usize, point.y as usize, color);
-        println!("point: x: {}, y: {}, z: {}, color: #{:X}", point.x, point.y, point.z, color);
+        println!("Rust: point: x: {}, y: {}, z: {}, color: #{:X}", point.x, point.y, point.z, color);
     }
 }

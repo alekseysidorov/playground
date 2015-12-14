@@ -29,7 +29,7 @@ struct GenericPixmap<T> {
 typealias Pixmap = GenericPixmap<UInt32>
 
 protocol Canvas {
-    func setPixel(x: Int, y: Int, color: UInt32);
+    func setPixel(x: Int, _ y: Int, color: UInt32);
 }
 
 class MyCanvas : Canvas {
@@ -39,7 +39,7 @@ class MyCanvas : Canvas {
         self.pixmap = Pixmap(width:width, height:height, fillValue:fillValue)
     }
     
-    func setPixel(x: Int, y: Int, color: UInt32)
+    func setPixel(x: Int, _ y: Int, color: UInt32)
     {
         pixmap[x, y] = color
     }
@@ -52,7 +52,7 @@ struct Vector3 {
 
     subscript(i: Int) -> Int {
         get {
-            precondition(i < 0 || i >= 3, "Index out-of-bounds")
+            precondition(i >= 0 && i < 3, "Index out-of-bounds")
             switch i {
             case 0: return self.x
             case 1: return self.y
@@ -61,7 +61,7 @@ struct Vector3 {
             }
         }
         set {
-            precondition(i < 0 || i >= 3, "Index out-of-bounds")            
+            precondition(i >= 0 && i < 3, "Index out-of-bounds")
             switch i {
             case 0: self.x = newValue
             case 1: self.y = newValue
@@ -70,6 +70,13 @@ struct Vector3 {
             }
         }        
     }
+}
+
+func == (left: Vector3, right: Vector3) -> Bool {
+    return (left.x == right.x) && (left.y == right.y) && (left.z == right.z)
+}
+func != (left: Vector3, right: Vector3) -> Bool {
+    return !(left == right)
 }
 
 class LineRaster {
@@ -97,11 +104,27 @@ class LineRaster {
 
     func next_point() -> Vector3? {
         if let state = self.state {
-            //if (self.from == self.to) {
+            if (self.from == self.to) {
                 return nil
-            //} else {
-
-            //}
+            } else {
+                let calsResidualSteps = {axis in return abs(self.to[axis] - self.from[axis])}
+                
+                self.from[state.majorAxis] += state.step[state.majorAxis];
+                let rsBase = calsResidualSteps(state.majorAxis);
+                for i in 0..<3 {
+                    let rs = calsResidualSteps(i);
+                    
+                    if rs > 0 && i != state.majorAxis {
+                        state.d[i] += rs;
+                        if state.d[i] >= rsBase {
+                            state.d[i] -= rsBase;
+                            self.from[i] += state.step[i];
+                        }
+                    }
+                }
+                
+                return self.from
+            }
         } else {
             let state = State()
             var max = 0;
@@ -119,4 +142,28 @@ class LineRaster {
             return self.from
         }
     }
+}
+
+extension LineRaster : GeneratorType {
+    func next() -> Vector3? {
+        return self.next_point()
+    }
+}
+
+extension LineRaster : SequenceType {
+    func generate() -> LineRaster {
+        return self
+    }
+}
+
+var canvas = MyCanvas(width: 300, height: 300, fillValue: 0)
+
+var a = Vector3(x: 0, y:0, z:0)
+var b = Vector3(x: 10, y:5, z:-4)
+
+let raster = LineRaster(from: a, to: b)
+for point in raster {
+    let color = UInt32.max
+    canvas.setPixel(point.x, point.y, color: color)
+    print("Swift: point: x: \(point.x), y: \(point.y), z:\(point.z), color: #\(color)")
 }
