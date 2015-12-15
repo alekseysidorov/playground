@@ -173,7 +173,32 @@ impl Iterator for LineRasterizer
     }
 }
 
+#[allow(dead_code)]
 fn test_code(canvas: &mut Canvas) {
+    let a = Vec3 { x: 0, y:0, z:0 };
+    let b = Vec3 { x: 50, y: 55, z: -20 };
+
+    let rasterizer = LineRasterizer::new(a, b);
+    for point in rasterizer {
+        let color = std::u32::MAX;
+        canvas.set_pixel(point.x as usize, point.y as usize, color);
+    }
+}
+
+#[allow(dead_code)]
+fn test_code_generic<T: Canvas>(canvas: &mut T) {
+    let a = Vec3 { x: 0, y:0, z:0 };
+    let b = Vec3 { x: 50, y: 55, z: -20 };
+
+    let rasterizer = LineRasterizer::new(a, b);
+    for point in rasterizer {
+        let color = std::u32::MAX;
+        canvas.set_pixel(point.x as usize, point.y as usize, color);
+    }
+}
+
+#[allow(dead_code)]
+fn test_code_boxed(canvas: &mut Box<Canvas>) {
     let a = Vec3 { x: 0, y:0, z:0 };
     let b = Vec3 { x: 50, y: 55, z: -20 };
 
@@ -197,7 +222,8 @@ fn main() {
         println!("Rust: point: x: {}, y: {}, z: {}, color: #{:X}", point.x, point.y, point.z, color);
     }
 
+    let mut boxed_canvas: Box<Canvas> = Box::new(canvas);
     for _ in 0..1000000 {
-        test_code(&mut canvas)
+        test_code_boxed(&mut boxed_canvas)
     }
 }

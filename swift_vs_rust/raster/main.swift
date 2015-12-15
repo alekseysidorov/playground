@@ -166,6 +166,26 @@ func testCode(canvas: Canvas) -> () {
     }
 }
 
+func testCodeInout(inout canvas: Canvas) -> () {
+    let a = Vector3(x: 0, y:0, z:0)
+    let b = Vector3(x: 50, y:55, z:-20)
+    let raster = LineRaster(from: a, to: b)
+    for point in raster {
+        let color = UInt32.max
+        canvas.setPixel(point.x, point.y, color: color)
+    }
+}
+
+func testCodeGeneric<T:Canvas>(canvas: T) -> () {
+    let a = Vector3(x: 0, y:0, z:0)
+    let b = Vector3(x: 50, y:55, z:-20)
+    let raster = LineRaster(from: a, to: b)
+    for point in raster {
+        let color = UInt32.max
+        canvas.setPixel(point.x, point.y, color: color)
+    }
+}
+
 var canvas = MyCanvas(width: 300, height: 300, fillValue: 0)
 
 var a = Vector3(x: 0, y:0, z:0)
@@ -177,6 +197,7 @@ for point in raster {
     print("Swift: point: x: \(point.x), y: \(point.y), z:\(point.z), color: #\(color)")
 }
 
+var myCanvas: Canvas = canvas
 for _ in 0..<1000000 {
-    testCode(canvas)
+    testCode(myCanvas)
 }
