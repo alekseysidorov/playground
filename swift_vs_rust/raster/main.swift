@@ -1,6 +1,6 @@
 struct GenericPixmap<T> {
-    var w: Int
-    var h: Int
+    let w: Int
+    let h: Int
 
     var data: [T]
 
@@ -197,7 +197,18 @@ for point in raster {
     print("Swift: point: x: \(point.x), y: \(point.y), z:\(point.z), color: #\(color)")
 }
 
+/*
 var myCanvas: Canvas = canvas
 for _ in 0..<1000000 {
     testCode(myCanvas)
+}
+
+for _ in 0..<1000000 {
+    testCodeGeneric(canvas)
+}
+*/
+
+var myCanvas: Canvas = canvas
+for _ in 0..<1000000 {
+    testCodeInout(&myCanvas)
 }

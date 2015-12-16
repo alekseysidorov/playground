@@ -221,6 +221,14 @@ fn main() {
         canvas.set_pixel(point.x as usize, point.y as usize, color);
         println!("Rust: point: x: {}, y: {}, z: {}, color: #{:X}", point.x, point.y, point.z, color);
     }
+    
+//     for _ in 0..1000000 {
+//         test_code(&mut canvas)
+//     }
+    
+//     for _ in 0..1000000 {
+//         test_code_generic(&mut canvas)
+//     }
 
     let mut boxed_canvas: Box<Canvas> = Box::new(canvas);
     for _ in 0..1000000 {
