@@ -10,9 +10,9 @@ struct GenericPixmap
     size_t w, h;
     std::vector<T> data;
 
-    GenericPixmap(size_t w_, size_t h_, T fill_data) :
+    GenericPixmap(size_t w_, size_t h_, T fill_data = T()) :
         w(w_), h(h_),
-        data(fill_data, w_*h_)
+        data(w_*h_, fill_data)
     {
 
     }
@@ -69,25 +69,25 @@ struct LineRaster
     bool next_point()
     {
         if (!state) {
-            auto state = new RasterState {
-                {}, {}, 0
+            auto s = new RasterState {
+                { 0, 0, 0 }, { 0, 0, 0 }, 0
             };
             
-            size_t max;
-            for (int i = 0; i < 0; ++i) {
+            size_t max = 0;
+            for (int i = 0; i < 3; ++i) {
                 auto d = to[i] - from[i];
-                state->step[i] = d > 0 ? 1 : -1;
+                s->step[i] = d > 0 ? 1 : -1;
 
                 d = std::abs(d);
                 if (d > max) {
                     max = d;
-                    state->majorAxis = i;
+                    s->majorAxis = i;
                 }
             }
-            this->state.reset(state);
+            state.reset(s);
             return true;
         } else {
-            if (this->from == this->to) 
+            if (from == to)
                 return false;
             else {
                 auto calc_rs = [this](auto axis) { return std::abs(to[axis] - from[axis]); };
@@ -97,7 +97,7 @@ struct LineRaster
                 for (int i = 0; i < 3; ++i) {
                     auto rs = calc_rs(i);
                     
-                    if (rs >= 0 && i != state->majorAxis) {
+                    if (rs > 0 && i != state->majorAxis) {
                         state->d[i] += rs;
                         if (state->d[i] >= rs_base) {
                             state->d[i] -= rs_base;
@@ -105,8 +105,8 @@ struct LineRaster
                         }
                     }
                 }
+                return true;
             }
-            return true;
         }
     }
 };
@@ -134,8 +134,12 @@ int main(int, char **) {
     LineRaster raster(a, b);
     while (raster.next_point()) {
         const auto &p = raster.from;
+
         uint32_t color = 0xffffff;
         pixmap[p.x][p.y] = color;
         std::cout << "C++: point x:" << p.x << " y:" << p.y << " z:" << p.z << " color:" << color << std::endl;
     }
+
+    for (size_t i = 0; i < 1000000; ++i)
+        test_code(pixmap);
 }
