@@ -61,30 +61,27 @@ struct LineRaster
     Vec3 from;
     Vec3 to;
     
-    std::unique_ptr<RasterState> state;
+    bool firstStep;
+    RasterState state;
 
-    LineRaster(const Vec3 &f, const Vec3 &t) : from(f), to(t)
+    LineRaster(const Vec3 &f, const Vec3 &t) : from(f), to(t), firstStep(true), state{}
     {}
 
     bool next_point()
     {
-        if (!state) {
-            auto s = new RasterState {
-                { 0, 0, 0 }, { 0, 0, 0 }, 0
-            };
-            
+        if (firstStep) {
             size_t max = 0;
             for (int i = 0; i < 3; ++i) {
                 auto d = to[i] - from[i];
-                s->step[i] = d > 0 ? 1 : -1;
+                state.step[i] = d > 0 ? 1 : -1;
 
                 d = std::abs(d);
                 if (d > max) {
                     max = d;
-                    s->majorAxis = i;
+                    state.majorAxis = i;
                 }
             }
-            state.reset(s);
+            firstStep = false;
             return true;
         } else {
             if (from == to)
@@ -92,15 +89,15 @@ struct LineRaster
             else {
                 auto calc_rs = [this](auto axis) { return std::abs(to[axis] - from[axis]); };
 
-                from[state->majorAxis] += state->step[state->majorAxis];
-                auto rs_base = calc_rs(state->majorAxis);
+                from[state.majorAxis] += state.step[state.majorAxis];
+                auto rs_base = calc_rs(state.majorAxis);
                 for (int i = 0; i < 3; ++i) {
                     auto rs = calc_rs(i);
                     
-                    if (rs > 0 && i != state->majorAxis) {
-                        state->d[i] += rs;
-                        if (state->d[i] >= rs_base) {
-                            state->d[i] -= rs_base;
+                    if (rs > 0 && i != state.majorAxis) {
+                        state.d[i] += rs;
+                        if (state.d[i] >= rs_base) {
+                            state.d[i] -= rs_base;
                             from[i] += state->step[i];
                         }
                     }
