@@ -222,16 +222,16 @@ fn main() {
         println!("Rust: point: x: {}, y: {}, z: {}, color: #{:X}", point.x, point.y, point.z, color);
     }
     
-//     for _ in 0..1000000 {
-//         test_code(&mut canvas)
-//     }
+     for _ in 0..1000000 {
+         test_code(&mut canvas)
+     }
     
 //     for _ in 0..1000000 {
 //         test_code_generic(&mut canvas)
 //     }
 
-    let mut boxed_canvas: Box<Canvas> = Box::new(canvas);
-    for _ in 0..1000000 {
-        test_code_boxed(&mut boxed_canvas)
-    }
+//    let mut boxed_canvas: Box<Canvas> = Box::new(canvas);
+//    for _ in 0..1000000 {
+//        test_code_boxed(&mut boxed_canvas)
+//    }
 }

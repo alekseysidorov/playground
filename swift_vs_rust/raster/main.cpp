@@ -98,7 +98,7 @@ struct LineRaster
                         state.d[i] += rs;
                         if (state.d[i] >= rs_base) {
                             state.d[i] -= rs_base;
-                            from[i] += state->step[i];
+                            from[i] += state.step[i];
                         }
                     }
                 }
