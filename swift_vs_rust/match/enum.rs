@@ -11,9 +11,9 @@ trait HasName {
 impl HasName for MathOperation {
     fn name(&self) -> &'static str {
         match *self {
-            MathOperation::Value(_) => "Value",
-            MathOperation::Sum(_,_) => "Sum",
-            MathOperation::Mul(_,_) => "Mul"
+            MathOperation::Value(..) => "Value",
+            MathOperation::Sum(..) => "Sum",
+            MathOperation::Mul(..) => "Mul"
         }
     }
 }

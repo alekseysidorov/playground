@@ -156,7 +156,7 @@ extension LineRaster : SequenceType {
     }
 }
 
-func testCode(canvas: Canvas) -> () {
+func testCode(canvas: Canvas) {
     let a = Vector3(x: 0, y:0, z:0)
     let b = Vector3(x: 50, y:55, z:-20)
     let raster = LineRaster(from: a, to: b)
