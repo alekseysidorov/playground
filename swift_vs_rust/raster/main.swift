@@ -1,19 +1,19 @@
 struct GenericPixmap<T> {
     let w: Int
     let h: Int
-
+    
     var data: [T]
-
+    
     init(width: Int, height: Int, fillValue: T) {
         self.w = width
         self.h = height
         self.data = [T](count: w*h, repeatedValue: fillValue)
     }
-
+    
     func indexIsValid(x: Int, _ y: Int) -> Bool {
         return x >= 0 && x < w && y >= 0 && y < h
     }
-
+    
     subscript(x: Int, y: Int) -> T {
         get {
             precondition(indexIsValid(x, y), "Index out-of-bounds")
@@ -49,7 +49,7 @@ struct Vector3 {
     var x: Int;
     var y: Int;
     var z: Int;
-
+    
     subscript(i: Int) -> Int {
         get {
             precondition(i >= 0 && i < 3, "Index out-of-bounds")
@@ -68,7 +68,7 @@ struct Vector3 {
             case 2: self.z = newValue
             default: break
             }
-        }        
+        }
     }
 }
 
@@ -79,31 +79,31 @@ func != (left: Vector3, right: Vector3) -> Bool {
     return !(left == right)
 }
 
-class LineRaster {
-
-    class State {
+struct LineRaster {
+    
+    struct State {
         var step: Vector3
         var d: Vector3
         var majorAxis: Int
-
+        
         init() {
             self.step = Vector3(x: 0, y: 0, z: 0)
             self.d = Vector3(x: 0, y: 0, z: 0)
             self.majorAxis = 0
         }
     }
-
+    
     var from: Vector3
     let to: Vector3
     var state: State?
-
+    
     init(from: Vector3, to: Vector3) {
         self.from = from
         self.to = to
     }
-
-    func next_point() -> Vector3? {
-        if let state = self.state {
+    
+    mutating func next_point() -> Vector3? {
+        if var state = self.state {
             if (self.from == self.to) {
                 return nil
             } else {
@@ -126,7 +126,7 @@ class LineRaster {
                 return self.from
             }
         } else {
-            let state = State()
+            var state = State()
             var max = 0;
             for i in 0..<3 {
                 let d = self.to[i] - self.from[i];
@@ -136,7 +136,7 @@ class LineRaster {
                 if da > max {
                     max = da;
                     state.majorAxis = i;
-                };                
+                };
             }
             self.state = state
             return self.from
@@ -145,7 +145,7 @@ class LineRaster {
 }
 
 extension LineRaster : GeneratorType {
-    func next() -> Vector3? {
+    mutating func next() -> Vector3? {
         return self.next_point()
     }
 }
