@@ -13,9 +13,9 @@ impl<'a> Curry<'a> {
     }
 }
 
-fn make_sum(a: i32, b: i32) -> i32
+fn make_sum(x: i32, y: i32) -> i32
 {
-    a + b
+    x + y
 }
 
 fn main() {
@@ -26,10 +26,10 @@ fn main() {
     let borrow = &make_sum;
     let f2 = Curry::new(borrow, b);
 
-    let mut d = 0;
+    let mut tmp = 0;
     for i in 0..1000000000 {
-        d = f2.call(i);
+        tmp = f2.call(i);
     }
 
-    println!("Rust: d is {}", d);
+    println!("Rust: tmp is {}", tmp);
 }
