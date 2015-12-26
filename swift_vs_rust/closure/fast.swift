@@ -10,14 +10,14 @@ import Swift
 
 /// Curry function `ƒ` with `toValue` as first parameter.
 public func apply(toValue: Int, _ ƒ: (Int, Int) -> Int) -> Int -> Int {
-    return { return ƒ(toValue, $0) }
+  return { return ƒ(toValue, $0) }
 }
 
 /// Return sum of two arithmetic values,
 /// ignore integer overflow.
 @inline(__always)
 public func unsafeSum(x: Int, _ y: Int) -> Int {
-    return x &+ y
+  return x &+ y
 }
 
 let a = 2, b = 5

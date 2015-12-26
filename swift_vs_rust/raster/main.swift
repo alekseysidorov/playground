@@ -38,12 +38,12 @@ public struct Pixmap<Element> {
   }
 }
 
-public protocol Canvas {
+public protocol CanvasType {
   mutating func setPixel(x: Int, _ y: Int, color: UInt32)
 }
 
-public struct MyCanvas : Canvas {
-  public var pixmap: Pixmap<UInt32>
+public struct Canvas: CanvasType {
+  public internal(set) var pixmap: Pixmap<UInt32>
 
   public init(width: Int, height: Int, fillValue: UInt32) {
     self.pixmap = Pixmap<UInt32>(width: width, height: height, fillValue: fillValue)
@@ -162,7 +162,7 @@ extension LineRaster: SequenceType {
   }
 }
 
-internal func testCode(canvas: Canvas) {
+internal func testCode(canvas: CanvasType) {
   var canvas = canvas
 
   let a = Vector3(x: 0, y:0, z:0)
@@ -174,7 +174,7 @@ internal func testCode(canvas: Canvas) {
   }
 }
 
-internal func testCodeInout(inout canvas: Canvas) {
+internal func testCodeInout(inout canvas: CanvasType) {
   let a = Vector3(x: 0, y:0, z:0)
   let b = Vector3(x: 50, y:55, z:-20)
   let raster = LineRaster(from: a, to: b)
@@ -184,7 +184,7 @@ internal func testCodeInout(inout canvas: Canvas) {
   }
 }
 
-internal func testCodeGeneric<T: Canvas>(canvas: T) {
+internal func testCodeGeneric<T: CanvasType>(canvas: T) {
   var canvas = canvas
 
   let a = Vector3(x: 0, y:0, z:0)
@@ -196,7 +196,7 @@ internal func testCodeGeneric<T: Canvas>(canvas: T) {
   }
 }
 
-var canvas: Canvas = MyCanvas(width: 300, height: 300, fillValue: 0)
+var canvas: CanvasType = Canvas(width: 300, height: 300, fillValue: 0)
 
 let a = Vector3(x: 0,  y: 0, z:  0)
 let b = Vector3(x: 10, y: 5, z: -4)
@@ -208,7 +208,7 @@ for point in raster {
   print("Swift: point: x: \(point.x), y: \(point.y), z:\(point.z), color: #\(String(color, radix: 16))")
 }
 
-// var myCanvas: Canvas = canvas
+// var myCanvas: CanvasType = canvas
 // for _ in 0..<1000000 {
 //   testCode(myCanvas)
 // }

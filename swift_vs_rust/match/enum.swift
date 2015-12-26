@@ -8,12 +8,12 @@
 
 import Swift
 
-public enum MathOperation {
-  case Value(Int32)
-  indirect case Sum(MathOperation, MathOperation)
-  indirect case Mul(MathOperation, MathOperation)
+public enum ArithmeticOperation<ArithmeticValue: IntegerArithmeticType> {
+  case Value(ArithmeticValue)
+  indirect case Sum(ArithmeticOperation, ArithmeticOperation)
+  indirect case Mul(ArithmeticOperation, ArithmeticOperation)
 
-  public func solve() -> Int32 {
+  public func solve() -> ArithmeticValue {
     switch self {
     case .Value(let value):      return value
     case .Sum(let lhs, let rhs): return lhs.solve() + rhs.solve()
@@ -22,12 +22,12 @@ public enum MathOperation {
   }
 }
 
-public protocol HasName {
-  func name() -> String
+public protocol Nameable {
+  var name: String { get }
 }
 
-extension MathOperation: HasName {
-  public func name() -> String {
+extension ArithmeticOperation: Nameable {
+  public var name: String {
     switch self {
     case .Value(_):  return "Value"
     case .Sum(_, _): return "Sum"
@@ -36,6 +36,6 @@ extension MathOperation: HasName {
   }
 }
 
-let op = MathOperation.Sum(.Value(10), .Mul(.Value(20), .Value(2)))
+let op = ArithmeticOperation.Sum(.Value(10), .Mul(.Value(20), .Value(2)))
 
-print("Swift: op is \(op.name()) solved \(op.solve())")
+print("Swift: op is \(op.name) solved \(op.solve())")
