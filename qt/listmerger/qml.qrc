@@ -1,5 +1,9 @@
 <RCC>
     <qresource prefix="/">
         <file>main.qml</file>
+        <file>ListMerger.qml</file>
+        <file>storage.js</file>
+        <file>TestWindow.qml</file>
+        <file>ParentWindow.qml</file>
     </qresource>
 </RCC>

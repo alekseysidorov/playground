@@ -1,11 +1,13 @@
 import QtQuick 2.5
 import QtQuick.Controls 1.4
 
-ApplicationWindow {
+TestWindow {
+    id: window
+
     visible: true
     width: 640
     height: 480
-    title: qsTr("Hello World")
+    title: qsTr("List merger demo")
 
     menuBar: MenuBar {
         Menu {
@@ -21,8 +23,33 @@ ApplicationWindow {
         }
     }
 
-    Label {
-        text: qsTr("Hello World")
+
+    ListMerger {
+        target: window
+        property: "values"
+
+        values: [
+            "I am a child",
+        ]
+    }
+
+    ListMerger {
+        target: window
+        property: "values"
+
+        values: [
+            "I am a grandchild",
+        ]
+    }
+
+    Column {
         anchors.centerIn: parent
+        spacing: 6
+
+        Repeater {
+            model: values
+
+            Label { text: modelData }
+        }
     }
 }
