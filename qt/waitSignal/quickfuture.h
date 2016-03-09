@@ -52,7 +52,7 @@ template <typename ...Args>
 QJSValueList QuickFuture::valueListFromArgs(Args ... args)
 {
     QJSValueList list;
-    fillValueList(list, args...);
+    fillValueList(list, std::forward<Args>(args)...);
     return list;
 }
 
