@@ -69,8 +69,8 @@ Window {
             acceleration: PointDirection {xVariation: 10; yVariation: 10;}
             velocityFromMovement: 8
 
-            size: 8
-            sizeVariation: 4
+            size: 16
+            sizeVariation: 2
         }
         //! [0]
         ParticleSystem { id: sys2 }
@@ -203,7 +203,7 @@ Window {
             //anchors.fill: parent
             property real radius: 0
             property real dx: root.width / 2
-            property real dy: root.height / 2
+            property real dy: root.height / 4
             property real cx: radius * Math.sin(percent*6.283185307179) + dx
             property real cy: radius * Math.cos(percent*6.283185307179) + dy
             property real percent: 0
@@ -257,7 +257,6 @@ Window {
                 NumberAnimation { from: 0.0; to: 1 ; duration: 10000;  }
             }
         }
-
         Item {
             id: circle2
             property real radius: 30
