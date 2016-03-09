@@ -5,7 +5,10 @@ CppApplication {
         "main.cpp",
         "quickeventloop.cpp",
         "quickeventloop.h",
+        "quickfuture.cpp",
+        "quickfuture.h",
     ]
+    cpp.cxxLanguageVersion: "c++14"
 
     Group {     // Properties for the produced executable
         fileTagsFilter: product.type

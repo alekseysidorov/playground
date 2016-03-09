@@ -55,6 +55,10 @@ ApplicationWindow {
                     timer.start()
                     waitFor(timer, "triggered")
                     label.text += "Clicked\n"
+
+                    test.doSlowOperation("I am slow!").then(function (set, string) {
+                        console.log(set, string);
+                    });
                 }
             }
 
