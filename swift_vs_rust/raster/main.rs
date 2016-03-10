@@ -4,12 +4,12 @@ use std::ops::{ Index, IndexMut };
 struct GenericPixmap<T> {
     w: usize,
     h: usize,
-    
-    data: Vec<T> 
+
+    data: Vec<T>
 }
 
-impl<T> GenericPixmap<T> 
-    where T: Copy + Clone 
+impl<T> GenericPixmap<T>
+    where T: Copy + Clone
 {
     fn new(w: usize, h: usize, fill_value: T) -> GenericPixmap<T> {
         GenericPixmap {
@@ -20,8 +20,8 @@ impl<T> GenericPixmap<T>
     }
 }
 
-impl<T> Index<usize> for  GenericPixmap<T> 
-    where T: Copy + Clone 
+impl<T> Index<usize> for GenericPixmap<T>
+    where T: Copy + Clone
 {
     type Output = [T];
 
@@ -31,16 +31,15 @@ impl<T> Index<usize> for  GenericPixmap<T>
         &self.data[from..to]
     }
 }
-impl<T> IndexMut<usize> for GenericPixmap<T> 
-    where T: Copy + Clone 
+impl<T> IndexMut<usize> for GenericPixmap<T>
+    where T: Copy + Clone
 {
     fn index_mut<'a>(&'a mut self, i: usize) -> &'a mut Self::Output {
         let from = i*self.w;
         let to = from+self.w;
         &mut self.data[from..to]
-    }    
+    }
 }
-
 
 type Pixmap = GenericPixmap<u32>;
 
@@ -86,7 +85,7 @@ impl IndexMut<usize> for Vec3
             2   => &mut self.z,
             _   => panic!("Wrong index"),
         }
-    }    
+    }
 }
 
 struct RasterState {
@@ -119,13 +118,13 @@ impl LineRasterizer {
                     step: Vec3 { x: 0, y: 0, z: 0 },
                     d: Vec3 { x: 0, y: 0, z: 0 },
                     major_axis: 0
-                };   
+                };
 
                 let mut max = 0;
                 for i in 0..3 {
                     let d = self.to[i] - self.from[i];
                     state.step[i] = if d > 0 { 1 } else { -1 };
-                    
+
                     let d = d.abs();
                     if d > max {
                         max = d;
@@ -142,12 +141,12 @@ impl LineRasterizer {
                 } else {
                     let from = self.from; let to = self.to;
                     let calc_residual_steps = |axis| { (to[axis] - from[axis]).abs() };
-                    
-                    self.from[state.major_axis] += state.step[state.major_axis];                    
+
+                    self.from[state.major_axis] += state.step[state.major_axis];
                     let rs_base = calc_residual_steps(state.major_axis);
                     for i in 0..3 {
                         let rs = calc_residual_steps(i);
-                        
+
                         if rs > 0 && i != state.major_axis {
                             state.d[i] += rs;
                             if state.d[i] >= rs_base {
@@ -155,7 +154,7 @@ impl LineRasterizer {
                                 self.from[i] += state.step[i];
                             }
                         }
-                    }                    
+                    }
 
                     Some(self.from)
                 }
@@ -219,13 +218,13 @@ fn main() {
     for point in rasterizer {
         let color = std::u32::MAX;
         canvas.set_pixel(point.x as usize, point.y as usize, color);
-        println!("Rust: point: x: {}, y: {}, z: {}, color: #{:X}", point.x, point.y, point.z, color);
+        println!("Rust:  point: x: {}, y: {}, z: {}, color: #{:X}", point.x, point.y, point.z, color);
     }
-    
+
      for _ in 0..1000000 {
          test_code(&mut canvas)
      }
-    
+
 //     for _ in 0..1000000 {
 //         test_code_generic(&mut canvas)
 //     }

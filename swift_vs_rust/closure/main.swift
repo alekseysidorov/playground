@@ -1,25 +1,30 @@
-func apply(f: (_: Int, _: Int) -> Int, _ v1: Int) -> (_: Int) -> Int
-{
-    return {(c: Int) -> Int in
-        return f(v1, c)
-    }
+//
+// main.swift
+// Swift VS Rust
+//
+// Created by <Name> on <Date>.
+// Copyright <Year and company>. All rights reserved.
+//
+
+/// Curry function `ƒ` with `toValue` as first parameter.
+public func apply(toValue: Int, _ ƒ: (Int, Int) -> Int) -> Int -> Int {
+    return { return ƒ(toValue, $0) }
 }
 
-func make_sum(a: Int, second b: Int) -> Int
-{
-    return a + b
+public func sum(x: Int, _ y: Int) -> Int {
+    return x + y
 }
 
-let a = 2; let b = 5;
-let c = make_sum(a, second:b)
+let a = 2, b = 5
+let c = sum(a, b)
 print("Swift: c is \(c)")
 
-let f2 = apply(make_sum, b)
-f2(a)
+let f = apply(b, sum) // apply(b) { $0 + $1 }
+f(a)
 
-var d = 0;
-for i in 0...1000000000 {
-    d = f2(i);
+var tmp = 0
+for element in 0..<1000000000 {
+    tmp = f(element)
 }
 
-print("Swift: d is \(d)");
+print("Swift: tmp is \(tmp)");

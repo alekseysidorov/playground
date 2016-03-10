@@ -32,7 +32,7 @@ fn main() {
     let op = MathOperation::Sum(Box::new(MathOperation::Value(10)),
                                 Box::new(MathOperation::Mul(Box::new(MathOperation::Value(20)),
                                                             Box::new(MathOperation::Value(2)))));
-                                
+
     ;
-    println!("Rust: op is {} solved {}", op.name(), op.solve());
+    println!("Rust:  op is {} solved {}", op.name(), op.solve());
 }
