@@ -107,7 +107,7 @@ public extension Pixmap {
 }
 
 public protocol CanvasType {
-  typealias Value
+  associatedtype Value
   subscript(x: Int, y: Int) -> Value { get mutating set }
   mutating func setPixel(x: Int, _ y: Int, color: Value)
 }
