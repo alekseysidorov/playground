@@ -22,6 +22,8 @@ CppApplication {
         qbs.installDir: "bin/qml/"
 
         prefix: "qml/"
-        files: [ "*.qml" ]
+        files: [
+            "*.qml",
+        ]
     }
 }
