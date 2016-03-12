@@ -9,6 +9,8 @@ Item {
 
     property int rx
     property int ry
+    property alias size: trailsStars.size
+    property alias sizeVariation: trailsStars.sizeVariation
 
     anchors.fill: parent
     opacity: intensivity / 255
@@ -21,8 +23,6 @@ Item {
         color: "cyan"
         system: particleSystem
         alpha: 0
-
-        colorVariation: 0.3
         source: "qrc:///particleresources/star.png"
     }
 
@@ -30,18 +30,17 @@ Item {
         id: trailsStars
         system: particleSystem
 
-        emitRate: 150
-        lifeSpan: 200
+        emitRate: 200
+        lifeSpan: 500
 
 
         x: root.rx
         y: root.ry
 
-        velocity: PointDirection {xVariation: 2; yVariation: 2;}
-        acceleration: PointDirection {xVariation: 5; yVariation: 5;}
-        velocityFromMovement: 1
+//        velocity: PointDirection {xVariation: 2; yVariation: 2;}
+//        acceleration: PointDirection {xVariation: 5; yVariation: 5;}
 
-        size: 32
-        sizeVariation: 4
+        size: 16
+        sizeVariation: 90
     }
 }

@@ -2,7 +2,11 @@ import qbs
 
 CppApplication {
     files: [
-        "main.cpp"
+        "blinker.c",
+        "blinker.h",
+        "ledmodel.cpp",
+        "ledmodel.h",
+        "main.cpp",
     ]
     cpp.cxxLanguageVersion: "c++14"
 
