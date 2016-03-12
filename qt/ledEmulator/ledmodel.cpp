@@ -39,7 +39,7 @@ QHash<int, QByteArray> LedModel::roleNames() const
 
 void LedModel::handleTimer()
 {
-    blinker_tick(m_blinkerConfig.blinker_context, m_leds.data());
+    blinker_tick(m_leds.data());
 
     emit dataChanged(createIndex(0, 0), createIndex(m_leds.size() - 1, 0));
 }

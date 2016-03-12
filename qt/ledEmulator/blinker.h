@@ -13,7 +13,6 @@ enum globals_ {
 
 typedef struct blinker_config_ {
     int refresh_interval; // in milliseconds
-    void *blinker_context;
 } blinker_config;
 
 typedef struct led_ {
@@ -23,8 +22,8 @@ typedef struct led_ {
 } led_type;
 
 void blinker_init(blinker_config *config);
-void blinker_tick(void *context, led_type *leds);
-void blinker_deinit(void **context);
+void blinker_tick(led_type *leds);
+void blinker_deinit(blinker_config *config);
 
 #ifdef __cplusplus
 }

@@ -99,30 +99,24 @@ led_type image[3][led_count] = {
     },
 };
 
-typedef struct blinker_context_ {
+static struct {
     int line;
 } blinker_context;
 
 void blinker_init(blinker_config *config)
 {
-    static blinker_context context;
-    context.line = 0;
-
     config->refresh_interval = 250;
-    config->blinker_context = &context;
 }
 
-void blinker_tick(void *context, led_type *leds)
+void blinker_tick(led_type *leds)
 {
-    blinker_context *c = (blinker_context*)context;
-
     for (int i = 0; i < led_count; ++i) {
-        leds[i] = image[c->line][i];
+        leds[i] = image[blinker_context.line][i];
     }
-    c->line = (c->line + 1) % 3;
+    blinker_context.line = (blinker_context.line + 1) % 3;
 }
 
-void blinker_deinit(void **context)
+void blinker_deinit(blinker_config *config)
 {
 
 }
