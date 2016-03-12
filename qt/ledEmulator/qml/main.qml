@@ -34,7 +34,7 @@ Window {
             loops: Animation.Infinite
             from: 0
             to: 360
-            duration: 1000
+            duration: 4000
             //running: false
         }
 
@@ -44,14 +44,14 @@ Window {
             RgbLed {
                 id: led
 
-                rx: root.cx + (200 + index * led.size / 8) * root.dx
-                ry: root.cy + (200 + index * led.size / 8) * root.dy
+                rx: root.cx + (300 + index * 10) * root.dx
+                ry: root.cy + (300 + index * 10) * root.dy
 
                 r: red
                 g: green
                 b: blue
-                size: 60
-                sizeVariation: 10
+                size: 40
+                sizeVariation: 0
             }
         }
     }
