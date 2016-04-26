@@ -1,6 +1,8 @@
 import qbs
 
 CppApplication {
+    property string sanitizer: ""
+
     files: [
         "blinker.c",
         "blinker.h",
@@ -29,5 +31,12 @@ CppApplication {
         files: [
             "*.qml",
         ]
+    }
+
+    Properties {
+        condition: sanitizer === "address"
+
+        cpp.commonCompilerFlags: "-fsanitize=address"
+        cpp.linkerFlags: "-fsanitize=address"
     }
 }
