@@ -1,0 +1,13 @@
+[package]
+name = "bincode-test"
+version = "0.1.0"
+authors = ["Aleksey Sidorov <aleksei.sidorov@xdev.re>"]
+
+[dependencies]
+serde = "1.0.32"
+serde_derive = "1.0.32"
+serde_json = "1.0.11"
+bincode = "1.0.0"
+erased-serde = "0.3.3"
+failure = "0.1.1"
+exonum = "0.6.0"
