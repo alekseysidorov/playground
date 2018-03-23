@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::time::SystemTime;
 use std::collections::BTreeMap;
 
@@ -8,28 +9,28 @@ use exonum::storage::StorageValue;
 use exonum::crypto::{self, hash, CryptoHash, Hash, PublicKey, SecretKey, Signature};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Message {
+pub struct Message<'a> {
     signature: Signature,
-    payload: AuthorizedPayload,
+    payload: AuthorizedPayload<'a>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct AuthorizedPayload {
+struct AuthorizedPayload<'a> {
     from: PublicKey,
-    payload: Vec<u8>,
+    payload: Cow<'a, [u8]>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Transaction {
+struct Transaction<'a> {
     service_id: u32,
-    payload: Vec<u8>,
+    payload: Cow<'a, [u8]>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-enum Consensus {
+enum Consensus<'a> {
     Connect { time: SystemTime },
     Block { state_hash: Hash },
-    Transaction(Transaction),
+    Transaction(Transaction<'a>),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -45,11 +46,11 @@ enum CryptoCurrencyTransactions {
     },
 }
 
-impl AuthorizedPayload {
-    fn new<T: Into<Consensus>>(from: PublicKey, msg: T) -> AuthorizedPayload {
+impl<'a> AuthorizedPayload<'a> {
+    fn new<'b, T: Into<Consensus<'b>>>(from: PublicKey, msg: T) -> AuthorizedPayload<'a> {
         AuthorizedPayload {
             from,
-            payload: bincode::serialize(&msg.into()).unwrap(),
+            payload: bincode::serialize(&msg.into()).unwrap().into(),
         }
     }
 
@@ -64,8 +65,8 @@ impl AuthorizedPayload {
     }
 }
 
-impl Message {
-    fn from_payload(payload: AuthorizedPayload, key: &SecretKey) -> Message {
+impl<'a> Message<'a> {
+    fn from_payload(payload: AuthorizedPayload<'a>, key: &SecretKey) -> Message<'a> {
         Message {
             signature: payload.sign(key),
             payload,
@@ -76,23 +77,23 @@ impl Message {
         self.payload.verify(&self.signature)
     }
 
-    fn decode(self) -> Consensus {
+    fn decode<'b>(self) -> Consensus<'b> {
         let bytes = self.payload.payload;
         bincode::deserialize(&bytes).unwrap()
     }
 }
 
-impl From<CryptoCurrencyTransactions> for Transaction {
-    fn from(value: CryptoCurrencyTransactions) -> Transaction {
+impl<'a> From<CryptoCurrencyTransactions> for Transaction<'a> {
+    fn from(value: CryptoCurrencyTransactions) -> Transaction<'a> {
         Transaction {
             service_id: 10,
-            payload: bincode::serialize(&value).unwrap(),
+            payload: bincode::serialize(&value).unwrap().into(),
         }
     }
 }
 
-impl<T: Into<Transaction>> From<T> for Consensus {
-    fn from(tx: T) -> Consensus {
+impl<'a, T: Into<Transaction<'a>>> From<T> for Consensus<'a> {
+    fn from(tx: T) -> Consensus<'a> {
         Consensus::Transaction(tx.into())
     }
 }
