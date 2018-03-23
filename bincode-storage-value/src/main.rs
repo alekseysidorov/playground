@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use exonum::storage::StorageValue;
-use exonum::crypto::{hash, CryptoHash, Hash};
+use exonum::crypto::{hash, CryptoHash, Hash, Signature, PublicKey};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone, Copy)]
 struct ConsenusConfiguration {
