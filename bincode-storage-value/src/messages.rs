@@ -10,13 +10,14 @@ use exonum::crypto::{self, hash, CryptoHash, Hash, PublicKey, SecretKey, Signatu
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Message<'a> {
-    signature: Signature,
+    signature: Cow<'a, Signature>,
     payload: AuthorizedPayload<'a>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct AuthorizedPayload<'a> {
-    from: PublicKey,
+    version: u16,
+    from: Cow<'a, PublicKey>,
     payload: Cow<'a, [u8]>,
 }
 
@@ -49,7 +50,8 @@ enum CryptoCurrencyTransactions {
 impl<'a> AuthorizedPayload<'a> {
     fn new<'b, T: Into<Consensus<'b>>>(from: PublicKey, msg: T) -> AuthorizedPayload<'a> {
         AuthorizedPayload {
-            from,
+            version: 0,
+            from: Cow::Owned(from),
             payload: bincode::serialize(&msg.into()).unwrap().into(),
         }
     }
@@ -68,7 +70,7 @@ impl<'a> AuthorizedPayload<'a> {
 impl<'a> Message<'a> {
     fn from_payload(payload: AuthorizedPayload<'a>, key: &SecretKey) -> Message<'a> {
         Message {
-            signature: payload.sign(key),
+            signature: Cow::Owned(payload.sign(key)),
             payload,
         }
     }
