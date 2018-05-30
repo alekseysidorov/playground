@@ -68,6 +68,18 @@ fn main() {
                     api_builder
                         .read_endpoint(MyConcreteEndpoint)
                         .read_endpoint(MyConcreteEndpoint2)
+                        .read_closure(
+                            "baz",
+                            |state: &ApiContext,
+                             request: &MyRequest|
+                             -> Result<MyResponse, failure::Error> {
+                                let string = format!(
+                                    "Context value: {} for name: {} with count: {}",
+                                    state.name, request.name, request.count
+                                );
+                                Ok(MyResponse(string))
+                            },
+                        )
                 })
                 .into_scope()
         })

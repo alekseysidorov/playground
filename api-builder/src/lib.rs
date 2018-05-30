@@ -97,4 +97,20 @@ impl ServiceApiBuilder {
         self.scope = self.scope.route(E::ID.name, actix_web::http::Method::GET, index);
         self
     }
+
+    pub fn read_closure<P, R, F>(mut self, name: &str, closure: F) -> ServiceApiBuilder 
+        where P: DeserializeOwned,
+            R: Serialize,
+            F: Fn(&ApiContext, &P) -> Result<R, failure::Error> + 'static
+    {
+        let index = move |request: actix_web::HttpRequest<ApiContext>| -> actix_web::Result<String> {
+            let state = request.state();
+            let query = Query::from_request(&request, &())?;
+            let response = closure(state, &query)?;
+            serde_json::to_string(&response).map_err(From::from)
+        };
+
+        self.scope = self.scope.route(name, actix_web::http::Method::GET, index);
+        self
+    }
 }
