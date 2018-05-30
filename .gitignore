@@ -107,3 +107,7 @@ android
 #qbs
 *.qbs.user.*
 *.user.*
+
+# rust
+target
+*/target
