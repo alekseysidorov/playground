@@ -68,10 +68,8 @@ impl EndpointMut for MyConcreteEndpoint2 {
         let hash = exonum::crypto::hash(request.seed.as_bytes());
         let mut fork = context.blockchain.fork();
         {
-            let mut schema = exonum::blockchain::Schema::new(&mut fork);
-            let mut cfg = schema.actual_configuration();
-            cfg.previous_cfg_hash = hash;
-            schema.commit_configuration(cfg);
+            let mut index = exonum::storage::ListIndex::new("foo", &mut fork);
+            index.push(hash);
         }
         context.blockchain.clone().merge(fork.into_patch())?;
         Ok(hash.to_string())
@@ -79,7 +77,7 @@ impl EndpointMut for MyConcreteEndpoint2 {
 }
 
 fn api_builder(context: ApiContextMut) -> App<ApiContextMut> {
-    App::with_state(context).scope("api_builder", |scope| {
+    App::with_state(context).prefix("builder").scope("api", |scope| {
         ApiBuilder::new(scope)
             .for_service("rustfest", |scope| {
                 scope
@@ -96,23 +94,14 @@ fn api_aggregator(context: ApiContextMut) -> App<ApiContextMut> {
         .endpoint_mut(MyConcreteEndpoint2)
         .endpoints();
 
-    App::with_state(context).scope("api_aggregator", |scope| {
+    App::with_state(context).prefix("aggregator").scope("api", |scope| {
         scope.nested("rustfest", |mut scope| {
-            for endpoint in endpoints.0 {
+            for endpoint in endpoints {
                 scope = scope.route(
-                    endpoint.0,
-                    actix_web::http::Method::GET,
-                    move |request: HttpRequest<ApiContextMut>| -> actix_web::Result<String> {
-                        endpoint.1(request)
-                    },
-                );
-            }
-            for endpoint_mut in endpoints.1 {
-                scope = scope.route(
-                    endpoint_mut.0,
-                    actix_web::http::Method::POST,
-                    move |request: HttpRequest<ApiContextMut>| -> actix_web::Result<String> {
-                        endpoint_mut.1(request)
+                    endpoint.name,
+                    endpoint.method.clone(),
+                    move |request| {
+                        (endpoint.handler)(request)
                     },
                 );
             }
@@ -122,6 +111,8 @@ fn api_aggregator(context: ApiContextMut) -> App<ApiContextMut> {
 }
 
 fn main() {
+    exonum::helpers::init_logger().unwrap();
+
     let keypair = exonum::crypto::gen_keypair();
 
     let api_sender = exonum::node::ApiSender::new(futures::sync::mpsc::channel(1).0);

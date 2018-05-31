@@ -25,7 +25,7 @@ impl ServiceApi for Scope<ApiContextMut> {
             serde_json::to_string(&response).map_err(From::from)
         };
 
-        self.route(E::NAME, actix_web::http::Method::GET, index)
+        self.route(E::NAME, actix_web::http::Method::POST, index)
     }
 }
 
@@ -35,9 +35,7 @@ pub struct ApiBuilder {
 
 impl ApiBuilder {
     pub fn new(scope: Scope<ApiContextMut>) -> ApiBuilder {
-        ApiBuilder {
-            scope: Scope::new(),
-        }
+        ApiBuilder { scope }
     }
 
     pub fn for_service<F>(mut self, name: &str, f: F) -> Self
@@ -53,38 +51,25 @@ impl ApiBuilder {
     }
 }
 
+pub struct EndpointHandler {
+    pub name: &'static str,
+    pub method: actix_web::http::Method,
+    pub handler: Box<Fn(HttpRequest<ApiContextMut>) -> actix_web::Result<String>>,
+}
+
 pub struct ServiceApiAggregator {
-    endpoints: Vec<(
-        &'static str,
-        Box<Fn(HttpRequest<ApiContextMut>) -> actix_web::Result<String>>,
-    )>,
-    endpoints_mut: Vec<(
-        &'static str,
-        Box<Fn(HttpRequest<ApiContextMut>) -> actix_web::Result<String>>,
-    )>,
+    endpoints: Vec<EndpointHandler>,
 }
 
 impl ServiceApiAggregator {
     pub fn new() -> ServiceApiAggregator {
         ServiceApiAggregator {
             endpoints: Vec::new(),
-            endpoints_mut: Vec::new(),
         }
     }
 
-    pub fn endpoints(
-        self,
-    ) -> (
-        Vec<(
-            &'static str,
-            Box<Fn(HttpRequest<ApiContextMut>) -> actix_web::Result<String>>,
-        )>,
-        Vec<(
-            &'static str,
-            Box<Fn(HttpRequest<ApiContextMut>) -> actix_web::Result<String>>,
-        )>,
-    ) {
-        (self.endpoints, self.endpoints_mut)
+    pub fn endpoints(self) -> Vec<EndpointHandler> {
+        self.endpoints
     }
 }
 
@@ -96,7 +81,11 @@ impl ServiceApi for ServiceApiAggregator {
             let response = endpoint.handle(context, query.into_inner())?;
             serde_json::to_string(&response).map_err(From::from)
         };
-        self.endpoints.push((E::NAME, Box::new(index)));
+        self.endpoints.push(EndpointHandler {
+            name: E::NAME,
+            handler: Box::new(index),
+            method: actix_web::http::Method::GET,
+        });
         self
     }
 
@@ -107,7 +96,11 @@ impl ServiceApi for ServiceApiAggregator {
             let response = endpoint.handle(context, query.into_inner())?;
             serde_json::to_string(&response).map_err(From::from)
         };
-        self.endpoints.push((E::NAME, Box::new(index)));
+        self.endpoints.push(EndpointHandler {
+            name: E::NAME,
+            handler: Box::new(index),
+            method: actix_web::http::Method::POST,
+        });
         self
     }
 }
