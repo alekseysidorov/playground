@@ -21,8 +21,16 @@ pub struct MyRequest {
     pub count: u64,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct Seed {
+    pub seed: String,
+}
+
 #[derive(Debug, Serialize)]
-pub struct MyResponse(String);
+pub struct MyResponse {
+    name: String,
+    value: u64,
+}
 
 pub struct MyConcreteEndpoint;
 pub struct MyConcreteEndpoint2;
@@ -37,24 +45,36 @@ impl Endpoint for MyConcreteEndpoint {
     fn handle(
         &self,
         context: &ApiContext,
-        request: &Self::Request,
+        request: Self::Request,
     ) -> Result<Self::Response, failure::Error> {
-        unimplemented!();
+        Ok(MyResponse {
+            name: request.name,
+            value: request.count * 2,
+        })
     }
 }
 
 impl EndpointMut for MyConcreteEndpoint2 {
     const NAME: &'static str = "bar";
 
-    type Request = ();
+    type Request = Seed;
     type Response = String;
 
     fn handle(
         &self,
         context: &ApiContextMut,
-        request: &Self::Request,
+        request: Self::Request,
     ) -> Result<Self::Response, failure::Error> {
-        unimplemented!();
+        let hash = exonum::crypto::hash(request.seed.as_bytes());
+        let mut fork = context.blockchain.fork();
+        {
+            let mut schema = exonum::blockchain::Schema::new(&mut fork);
+            let mut cfg = schema.actual_configuration();
+            cfg.previous_cfg_hash = hash;
+            schema.commit_configuration(cfg);
+        }
+        context.blockchain.clone().merge(fork.into_patch())?;
+        Ok(hash.to_string())
     }
 }
 
@@ -71,7 +91,7 @@ fn api_builder(context: ApiContextMut) -> App<ApiContextMut> {
 }
 
 fn api_aggregator(context: ApiContextMut) -> App<ApiContextMut> {
-    let endpoints = ServiceApiAggregator::new(&context)
+    let endpoints = ServiceApiAggregator::new()
         .endpoint(MyConcreteEndpoint)
         .endpoint_mut(MyConcreteEndpoint2)
         .endpoints();

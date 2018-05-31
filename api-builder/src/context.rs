@@ -5,12 +5,12 @@ use std::ops::Deref;
 
 #[derive(Debug, Clone)]
 pub struct ApiContext {
-    blockchain: Blockchain
+    pub blockchain: Blockchain
 }
 
 #[derive(Debug, Clone)]
 pub struct ApiContextMut {
-    pub(crate) inner: ApiContext
+    pub inner: ApiContext
 }
 
 impl ApiContextMut {

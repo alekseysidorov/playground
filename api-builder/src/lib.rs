@@ -20,7 +20,7 @@ pub trait Endpoint: 'static {
     type Request: DeserializeOwned;
     type Response: Serialize;
 
-    fn handle(&self, context: &context::ApiContext, request: &Self::Request) -> Result<Self::Response, error::Error>;
+    fn handle(&self, context: &context::ApiContext, request: Self::Request) -> Result<Self::Response, error::Error>;
 }
 
 pub trait EndpointMut: 'static {
@@ -29,7 +29,7 @@ pub trait EndpointMut: 'static {
     type Request: DeserializeOwned;
     type Response: Serialize;
 
-    fn handle(&self, context: &context::ApiContextMut, request: &Self::Request) -> Result<Self::Response, error::Error>;
+    fn handle(&self, context: &context::ApiContextMut, request: Self::Request) -> Result<Self::Response, error::Error>;
 }
 
 pub trait ServiceApi {

@@ -9,8 +9,8 @@ impl ServiceApi for Scope<ApiContextMut> {
     fn endpoint<E: Endpoint>(self, endpoint: E) -> Self {
         let index = move |request: HttpRequest<ApiContextMut>| -> actix_web::Result<String> {
             let context = request.state();
-            let query = Query::from_request(&request, &())?;
-            let response = endpoint.handle(context, &query)?;
+            let query = Query::<E::Request>::from_request(&request, &())?;
+            let response = endpoint.handle(context, query.into_inner())?;
             serde_json::to_string(&response).map_err(From::from)
         };
 
@@ -20,8 +20,8 @@ impl ServiceApi for Scope<ApiContextMut> {
     fn endpoint_mut<E: EndpointMut>(self, endpoint: E) -> Self {
         let index = move |request: HttpRequest<ApiContextMut>| -> actix_web::Result<String> {
             let context = request.state();
-            let query = Query::from_request(&request, &())?;
-            let response = endpoint.handle(context, &query)?;
+            let query = Query::<E::Request>::from_request(&request, &())?;
+            let response = endpoint.handle(context, query.into_inner())?;
             serde_json::to_string(&response).map_err(From::from)
         };
 
@@ -53,16 +53,20 @@ impl ApiBuilder {
     }
 }
 
-pub struct ServiceApiAggregator<'a> {
-    context: &'a ApiContextMut,
-    endpoints: Vec<(&'static str, Box<Fn(HttpRequest<ApiContextMut>) -> actix_web::Result<String>>)>,
-    endpoints_mut: Vec<(&'static str, Box<Fn(HttpRequest<ApiContextMut>) -> actix_web::Result<String>>)>,
+pub struct ServiceApiAggregator {
+    endpoints: Vec<(
+        &'static str,
+        Box<Fn(HttpRequest<ApiContextMut>) -> actix_web::Result<String>>,
+    )>,
+    endpoints_mut: Vec<(
+        &'static str,
+        Box<Fn(HttpRequest<ApiContextMut>) -> actix_web::Result<String>>,
+    )>,
 }
 
-impl<'a> ServiceApiAggregator<'a> {
-    pub fn new(context: &'a ApiContextMut) -> ServiceApiAggregator {
+impl ServiceApiAggregator {
+    pub fn new() -> ServiceApiAggregator {
         ServiceApiAggregator {
-            context,
             endpoints: Vec::new(),
             endpoints_mut: Vec::new(),
         }
@@ -71,23 +75,25 @@ impl<'a> ServiceApiAggregator<'a> {
     pub fn endpoints(
         self,
     ) -> (
-        Vec<
-            (&'static str, Box<Fn(HttpRequest<ApiContextMut>) -> actix_web::Result<String>>),
-        >,
-        Vec<
-            (&'static str, Box<Fn(HttpRequest<ApiContextMut>) -> actix_web::Result<String>>),
-        >,
+        Vec<(
+            &'static str,
+            Box<Fn(HttpRequest<ApiContextMut>) -> actix_web::Result<String>>,
+        )>,
+        Vec<(
+            &'static str,
+            Box<Fn(HttpRequest<ApiContextMut>) -> actix_web::Result<String>>,
+        )>,
     ) {
         (self.endpoints, self.endpoints_mut)
     }
 }
 
-impl<'a> ServiceApi for ServiceApiAggregator<'a> {
+impl ServiceApi for ServiceApiAggregator {
     fn endpoint<E: Endpoint>(mut self, endpoint: E) -> Self {
         let index = move |request: HttpRequest<ApiContextMut>| -> actix_web::Result<String> {
             let context = request.state();
-            let query = Query::from_request(&request, &())?;
-            let response = endpoint.handle(context, &query)?;
+            let query = Query::<E::Request>::from_request(&request, &())?;
+            let response = endpoint.handle(context, query.into_inner())?;
             serde_json::to_string(&response).map_err(From::from)
         };
         self.endpoints.push((E::NAME, Box::new(index)));
@@ -97,8 +103,8 @@ impl<'a> ServiceApi for ServiceApiAggregator<'a> {
     fn endpoint_mut<E: EndpointMut>(mut self, endpoint: E) -> Self {
         let index = move |request: HttpRequest<ApiContextMut>| -> actix_web::Result<String> {
             let context = request.state();
-            let query = Query::from_request(&request, &())?;
-            let response = endpoint.handle(context, &query)?;
+            let query = Query::<E::Request>::from_request(&request, &())?;
+            let response = endpoint.handle(context, query.into_inner())?;
             serde_json::to_string(&response).map_err(From::from)
         };
         self.endpoints.push((E::NAME, Box::new(index)));
