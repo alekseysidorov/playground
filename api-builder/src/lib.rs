@@ -4,7 +4,7 @@ extern crate serde_json;
 extern crate failure;
 extern crate exonum;
 
-use actix_web::{Scope, Query, FromRequest};
+use actix_web::{Scope, Query, FromRequest, Responder};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 

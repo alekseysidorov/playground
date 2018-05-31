@@ -3,12 +3,14 @@ use exonum::storage::Snapshot;
 
 use std::ops::Deref;
 
+#[derive(Debug, Clone)]
 pub struct ApiContext {
     blockchain: Blockchain
 }
 
+#[derive(Debug, Clone)]
 pub struct ApiContextMut {
-    inner: ApiContext
+    pub(crate) inner: ApiContext
 }
 
 impl ApiContextMut {
