@@ -5,52 +5,6 @@ use serde_json;
 use context::{ApiContext, ApiContextMut};
 use {Endpoint, EndpointMut, ServiceApi};
 
-impl ServiceApi for Scope<ApiContextMut> {
-    fn endpoint<E: Endpoint>(self, endpoint: E) -> Self {
-        let index = move |request: HttpRequest<ApiContextMut>| -> actix_web::Result<String> {
-            let context = request.state();
-            let query = Query::<E::Request>::from_request(&request, &())?;
-            let response = endpoint.handle(context, query.into_inner())?;
-            serde_json::to_string(&response).map_err(From::from)
-        };
-
-        self.route(E::NAME, actix_web::http::Method::GET, index)
-    }
-
-    fn endpoint_mut<E: EndpointMut>(self, endpoint: E) -> Self {
-        let index = move |request: HttpRequest<ApiContextMut>| -> actix_web::Result<String> {
-            let context = request.state();
-            let query = Query::<E::Request>::from_request(&request, &())?;
-            let response = endpoint.handle(context, query.into_inner())?;
-            serde_json::to_string(&response).map_err(From::from)
-        };
-
-        self.route(E::NAME, actix_web::http::Method::POST, index)
-    }
-}
-
-pub struct ApiBuilder {
-    scope: Scope<ApiContextMut>,
-}
-
-impl ApiBuilder {
-    pub fn new(scope: Scope<ApiContextMut>) -> ApiBuilder {
-        ApiBuilder { scope }
-    }
-
-    pub fn for_service<F>(mut self, name: &str, f: F) -> Self
-    where
-        F: FnOnce(Scope<ApiContextMut>) -> Scope<ApiContextMut>,
-    {
-        self.scope = self.scope.nested(name, f);
-        self
-    }
-
-    pub fn into_scope(self) -> Scope<ApiContextMut> {
-        self.scope
-    }
-}
-
 pub struct EndpointHandler {
     pub name: &'static str,
     pub method: actix_web::http::Method,

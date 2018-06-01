@@ -76,18 +76,6 @@ impl EndpointMut for MyConcreteEndpoint2 {
     }
 }
 
-fn api_builder(context: ApiContextMut) -> App<ApiContextMut> {
-    App::with_state(context).prefix("builder").scope("api", |scope| {
-        ApiBuilder::new(scope)
-            .for_service("rustfest", |scope| {
-                scope
-                    .endpoint(MyConcreteEndpoint)
-                    .endpoint_mut(MyConcreteEndpoint2)
-            })
-            .into_scope()
-    })
-}
-
 fn api_aggregator(context: ApiContextMut) -> App<ApiContextMut> {
     let endpoints = ServiceApiAggregator::new()
         .endpoint(MyConcreteEndpoint)
@@ -121,10 +109,7 @@ fn main() {
     let context = ApiContextMut::new(blockchain);
 
     server::new(move || {
-        vec![
-            api_builder(context.clone()),
-            api_aggregator(context.clone()),
-        ]
+            api_aggregator(context.clone())
     }).bind("localhost:8080")
         .unwrap()
         .run()
