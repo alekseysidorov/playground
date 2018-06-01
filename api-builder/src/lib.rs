@@ -38,8 +38,3 @@ pub trait EndpointMut: 'static {
         request: Self::Request,
     ) -> Result<Self::Response, error::Error>;
 }
-
-pub trait ServiceApi {
-    fn endpoint<E: Endpoint>(self, endpoint: E) -> Self;
-    fn endpoint_mut<E: EndpointMut>(self, endpoint: E) -> Self;
-}
