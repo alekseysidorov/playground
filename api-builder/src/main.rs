@@ -32,8 +32,11 @@ pub struct MyResponse {
     value: u64,
 }
 
+#[derive(Clone)]
 pub struct MyConcreteEndpoint;
+#[derive(Clone)]
 pub struct MyConcreteEndpoint2;
+#[derive(Clone)]
 pub struct MyConcreteEndpoint3;
 
 impl Endpoint for MyConcreteEndpoint {

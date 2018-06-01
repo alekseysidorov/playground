@@ -1,10 +1,13 @@
 use actix_web::pred::*;
 use actix_web::{self, AsyncResponder, FromRequest, HttpMessage, HttpRequest, HttpResponse, Query};
 use futures::{Future, IntoFuture};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use serde_json;
 
 use context::{ApiContext, ApiContextMut};
-use {Endpoint, EndpointMut};
+use error;
+use {Endpoint, EndpointMut, EndpointMutSpec, EndpointSpec};
 
 pub type RequestHandler =
     Fn(HttpRequest<ApiContextMut>) -> Box<Future<Item = HttpResponse, Error = actix_web::Error>>;
@@ -87,14 +90,14 @@ impl ServiceApiBackend for ServiceApiWebBackend {
     type Method = actix_web::http::Method;
 
     fn endpoint<E: Endpoint>(mut self, endpoint: E) -> Self {
-        self.endpoints
-            .push(EndpointHandler::from_endpoint(endpoint));
+        let spec = EndpointSpec::from(endpoint);
+        self.endpoints.push(spec.into());
         self
     }
 
     fn endpoint_mut<E: EndpointMut>(mut self, endpoint: E) -> Self {
-        self.endpoints
-            .push(EndpointHandler::from_endpoint_mut(endpoint));
+        let spec = EndpointMutSpec::from(endpoint);
+        self.endpoints.push(spec.into());
         self
     }
 
@@ -110,5 +113,59 @@ impl ServiceApiBackend for ServiceApiWebBackend {
             handler,
         });
         self
+    }
+}
+
+impl<Q, R, F> From<EndpointSpec<Q, R, F>> for EndpointHandler
+where
+    Q: DeserializeOwned + 'static,
+    R: Serialize + 'static,
+    F: 'static,
+    for<'r> F: Fn(&'r ApiContext, Q) -> Result<R, error::Error>,
+{
+    fn from(spec: EndpointSpec<Q, R, F>) -> Self {
+        let name = spec.name;
+        let index = move |request: HttpRequest<ApiContextMut>| -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
+            let to_response = |request: HttpRequest<ApiContextMut>| -> Result<HttpResponse, actix_web::Error> {
+                let context = request.state();
+                let query: Query<Q> = Query::from_request(&request, &())?;
+                let value = (spec.handler)(context, query.into_inner())?;
+                Ok(HttpResponse::Ok().json(value))
+            };
+
+            Box::new(to_response(request).into_future())
+        };
+
+        EndpointHandler {
+            name: name,
+            handler: Box::new(index),
+            method: actix_web::http::Method::GET,
+        }
+    }
+}
+
+impl<Q, R, F> From<EndpointMutSpec<Q, R, F>> for EndpointHandler
+where
+    Q: DeserializeOwned + 'static,
+    R: Serialize + 'static,
+    F: 'static + Clone,
+    for<'r> F: Fn(&'r ApiContextMut, Q) -> Result<R, error::Error>,
+{
+    fn from(spec: EndpointMutSpec<Q, R, F>) -> Self {
+        let name = spec.name;
+        let index = move |request: HttpRequest<ApiContextMut>| -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
+            let context = request.state().clone();
+            let handler = spec.handler.clone();
+            request.json().from_err().and_then(move |query: Q| {
+                let value = (handler)(&context, query)?;
+                Ok(HttpResponse::Ok().json(value))
+            }).responder()
+        };
+
+        EndpointHandler {
+            name: name,
+            handler: Box::new(index),
+            method: actix_web::http::Method::GET,
+        }
     }
 }
