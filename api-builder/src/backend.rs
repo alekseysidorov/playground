@@ -6,12 +6,8 @@ use serde_json;
 use context::{ApiContext, ApiContextMut};
 use {Endpoint, EndpointMut};
 
-pub trait ServiceApi {
-    fn endpoint<E: Endpoint>(self, endpoint: E) -> Self;
-    fn endpoint_mut<E: EndpointMut>(self, endpoint: E) -> Self;
-}
-
-pub type RequestHandler = Fn(HttpRequest<ApiContextMut>) -> Box<Future<Item = HttpResponse, Error = actix_web::Error>>;
+pub type RequestHandler =
+    Fn(HttpRequest<ApiContextMut>) -> Box<Future<Item = HttpResponse, Error = actix_web::Error>>;
 
 pub struct EndpointHandler {
     pub name: &'static str,
@@ -32,7 +28,7 @@ impl EndpointHandler {
             Box::new(to_response(request).into_future())
         };
 
-       EndpointHandler {
+        EndpointHandler {
             name: E::NAME,
             handler: Box::new(index),
             method: actix_web::http::Method::GET,
@@ -56,13 +52,13 @@ impl EndpointHandler {
     }
 }
 
-pub struct ServiceApiAggregator {
+pub struct ServiceApiWebBackend {
     endpoints: Vec<EndpointHandler>,
 }
 
-impl ServiceApiAggregator {
-    pub fn new() -> ServiceApiAggregator {
-        ServiceApiAggregator {
+impl ServiceApiWebBackend {
+    pub fn new() -> ServiceApiWebBackend {
+        ServiceApiWebBackend {
             endpoints: Vec::new(),
         }
     }
@@ -72,14 +68,47 @@ impl ServiceApiAggregator {
     }
 }
 
-impl ServiceApi for ServiceApiAggregator {
+pub trait ServiceApiBackend {
+    type RawHandler;
+    type Method;
+
+    fn endpoint<E: Endpoint>(self, endpoint: E) -> Self;
+    fn endpoint_mut<E: EndpointMut>(self, endpoint: E) -> Self;
+    fn raw_handler(
+        self,
+        name: &'static str,
+        method: Self::Method,
+        handler: Self::RawHandler,
+    ) -> Self;
+}
+
+impl ServiceApiBackend for ServiceApiWebBackend {
+    type RawHandler = Box<RequestHandler>;
+    type Method = actix_web::http::Method;
+
     fn endpoint<E: Endpoint>(mut self, endpoint: E) -> Self {
-        self.endpoints.push(EndpointHandler::from_endpoint(endpoint));
+        self.endpoints
+            .push(EndpointHandler::from_endpoint(endpoint));
         self
     }
 
     fn endpoint_mut<E: EndpointMut>(mut self, endpoint: E) -> Self {
-        self.endpoints.push(EndpointHandler::from_endpoint_mut(endpoint));
+        self.endpoints
+            .push(EndpointHandler::from_endpoint_mut(endpoint));
+        self
+    }
+
+    fn raw_handler(
+        mut self,
+        name: &'static str,
+        method: Self::Method,
+        handler: Self::RawHandler,
+    ) -> Self {
+        self.endpoints.push(EndpointHandler {
+            name,
+            method,
+            handler,
+        });
         self
     }
 }

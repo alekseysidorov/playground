@@ -76,7 +76,7 @@ impl EndpointMut for MyConcreteEndpoint2 {
 }
 
 fn api_aggregator(context: ApiContextMut) -> App<ApiContextMut> {
-    let endpoints = ServiceApiAggregator::new()
+    let endpoints = ServiceApiWebBackend::new()
         .endpoint(MyConcreteEndpoint)
         .endpoint_mut(MyConcreteEndpoint2)
         .endpoints();
