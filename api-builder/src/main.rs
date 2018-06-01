@@ -43,7 +43,6 @@ impl Endpoint for MyConcreteEndpoint {
     type Response = MyResponse;
 
     fn handle(
-        &self,
         context: &ApiContext,
         request: Self::Request,
     ) -> Result<Self::Response, failure::Error> {
@@ -58,21 +57,21 @@ impl EndpointMut for MyConcreteEndpoint2 {
     const NAME: &'static str = "bar";
 
     type Request = Seed;
-    type Response = String;
+    type Response = (u64, exonum::crypto::Hash);
 
     fn handle(
-        &self,
         context: &ApiContextMut,
         request: Self::Request,
     ) -> Result<Self::Response, failure::Error> {
         let hash = exonum::crypto::hash(request.seed.as_bytes());
         let mut fork = context.blockchain.fork();
-        {
+        let len = {
             let mut index = exonum::storage::ListIndex::new("foo", &mut fork);
             index.push(hash);
-        }
+            index.len()
+        };
         context.blockchain.clone().merge(fork.into_patch())?;
-        Ok(hash.to_string())
+        Ok((len, hash))
     }
 }
 
@@ -82,35 +81,31 @@ fn api_aggregator(context: ApiContextMut) -> App<ApiContextMut> {
         .endpoint_mut(MyConcreteEndpoint2)
         .endpoints();
 
-    App::with_state(context).prefix("aggregator").scope("api", |scope| {
-        scope.nested("rustfest", |mut scope| {
-            for endpoint in endpoints {
-                scope = scope.route(
-                    endpoint.name,
-                    endpoint.method.clone(),
-                    move |request| {
+    App::with_state(context)
+        .prefix("aggregator")
+        .scope("api", |scope| {
+            scope.nested("rustfest", |mut scope| {
+                for endpoint in endpoints {
+                    scope = scope.route(endpoint.name, endpoint.method.clone(), move |request| {
                         (endpoint.handler)(request)
-                    },
-                );
-            }
-            scope
+                    });
+                }
+                scope
+            })
         })
-    })
 }
 
 fn main() {
     exonum::helpers::init_logger().unwrap();
 
     let keypair = exonum::crypto::gen_keypair();
-
     let api_sender = exonum::node::ApiSender::new(futures::sync::mpsc::channel(1).0);
-    let db = exonum::storage::MemoryDB::new();
+    let db = exonum::storage::RocksDB::open("/tmp/actix", &exonum::storage::DbOptions::default())
+        .unwrap();
     let blockchain = Blockchain::new(db, vec![], keypair.0, keypair.1, api_sender);
-    let context = ApiContextMut::new(blockchain);
 
-    server::new(move || {
-            api_aggregator(context.clone())
-    }).bind("localhost:8080")
+    server::new(move || api_aggregator(ApiContextMut::new(blockchain.clone())))
+        .bind("localhost:8080")
         .unwrap()
         .run()
 }

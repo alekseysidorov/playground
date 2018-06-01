@@ -1,10 +1,11 @@
 extern crate actix_web;
+extern crate exonum;
+extern crate failure;
+extern crate futures;
 extern crate serde;
 extern crate serde_json;
-extern crate failure;
-extern crate exonum;
 
-use actix_web::{Scope, Query, FromRequest, Responder};
+use actix_web::{FromRequest, Query, Responder, Scope};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -20,7 +21,10 @@ pub trait Endpoint: 'static {
     type Request: DeserializeOwned;
     type Response: Serialize;
 
-    fn handle(&self, context: &context::ApiContext, request: Self::Request) -> Result<Self::Response, error::Error>;
+    fn handle(
+        context: &context::ApiContext,
+        request: Self::Request,
+    ) -> Result<Self::Response, error::Error>;
 }
 
 pub trait EndpointMut: 'static {
@@ -29,7 +33,10 @@ pub trait EndpointMut: 'static {
     type Request: DeserializeOwned;
     type Response: Serialize;
 
-    fn handle(&self, context: &context::ApiContextMut, request: Self::Request) -> Result<Self::Response, error::Error>;
+    fn handle(
+        context: &context::ApiContextMut,
+        request: Self::Request,
+    ) -> Result<Self::Response, error::Error>;
 }
 
 pub trait ServiceApi {
