@@ -1,22 +1,19 @@
-use actix_web::pred::*;
 use actix_web::{self, AsyncResponder, FromRequest, HttpMessage, HttpRequest, HttpResponse, Query};
-use futures::{Future, IntoFuture};
 use failure;
+use futures::{Future, IntoFuture};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use serde_json;
 
 use context::{ApiContext, ApiContextMut};
-use error;
-use {EndpointMutSpec, EndpointSpec};
+use EndpointKind;
 
-pub type RequestHandler =
+pub type WebRequestHandler =
     Fn(HttpRequest<ApiContextMut>) -> Box<Future<Item = HttpResponse, Error = actix_web::Error>>;
 
 pub struct EndpointHandler {
     pub name: &'static str,
     pub method: actix_web::http::Method,
-    pub handler: Box<RequestHandler>,
+    pub handler: Box<WebRequestHandler>,
 }
 
 pub struct ServiceApiWebBackend {
@@ -39,15 +36,23 @@ pub trait ServiceApiBackend {
     type RawHandler;
     type Method;
 
-    fn method<Q, R,>(self, name: &'static str, f: for<'r> fn(&'r ApiContext, Q) -> Result<R, failure::Error>) -> Self
+    fn endpoint<Q, R>(
+        self,
+        name: &'static str,
+        f: for<'r> fn(&'r ApiContext, Q) -> Result<R, failure::Error>,
+    ) -> Self
     where
         Q: DeserializeOwned + 'static,
         R: Serialize + 'static;
 
-    fn method_mut<Q, R,>(self, name: &'static str, f: for<'r> fn(&'r ApiContextMut, Q) -> Result<R, failure::Error>) -> Self
+    fn endpoint_mut<Q, R>(
+        self,
+        name: &'static str,
+        f: for<'r> fn(&'r ApiContextMut, Q) -> Result<R, failure::Error>,
+    ) -> Self
     where
         Q: DeserializeOwned + 'static,
-        R: Serialize + 'static;        
+        R: Serialize + 'static;
 
     fn raw_handler(
         self,
@@ -58,39 +63,37 @@ pub trait ServiceApiBackend {
 }
 
 impl ServiceApiBackend for ServiceApiWebBackend {
-    type RawHandler = Box<RequestHandler>;
+    type RawHandler = Box<WebRequestHandler>;
     type Method = actix_web::http::Method;
 
-    fn method<Q, R>(mut self, name: &'static str, f: for<'r> fn(&'r ApiContext, Q) -> Result<R, failure::Error>) -> Self
+    fn endpoint<Q, R>(
+        mut self,
+        name: &'static str,
+        f: for<'r> fn(&'r ApiContext, Q) -> Result<R, failure::Error>,
+    ) -> Self
     where
         Q: DeserializeOwned + 'static,
-        R: Serialize + 'static
+        R: Serialize + 'static,
     {
-        let spec = EndpointSpec {
-            name,
-            handler: f,
-            _query: ::std::marker::PhantomData,
-            _response: ::std::marker::PhantomData,            
-        };
-        self.endpoints.push(spec.into());
-        self        
+        self.endpoints
+            .push(EndpointHandler::new(name, EndpointKind::Immutable(f)));
+        self
     }
 
-    fn method_mut<Q, R>(mut self, name: &'static str, f: for<'r> fn(&'r ApiContextMut, Q) -> Result<R, failure::Error>) -> Self
+    fn endpoint_mut<Q, R>(
+        mut self,
+        name: &'static str,
+        f: for<'r> fn(&'r ApiContextMut, Q) -> Result<R, failure::Error>,
+    ) -> Self
     where
         Q: DeserializeOwned + 'static,
-        R: Serialize + 'static
+        R: Serialize + 'static,
     {
-        let spec = EndpointMutSpec {
-            name,
-            handler: f,
-            _query: ::std::marker::PhantomData,
-            _response: ::std::marker::PhantomData,            
-        };
-        self.endpoints.push(spec.into());
-        self        
+        self.endpoints
+            .push(EndpointHandler::new(name, EndpointKind::Mutable(f)));
+        self
     }
-    
+
     fn raw_handler(
         mut self,
         name: &'static str,
@@ -106,56 +109,44 @@ impl ServiceApiBackend for ServiceApiWebBackend {
     }
 }
 
-impl<Q, R, F> From<EndpointSpec<Q, R, F>> for EndpointHandler
-where
-    Q: DeserializeOwned + 'static,
-    R: Serialize + 'static,
-    F: 'static,
-    for<'r> F: Fn(&'r ApiContext, Q) -> Result<R, error::Error>,
-{
-    fn from(spec: EndpointSpec<Q, R, F>) -> Self {
-        let name = spec.name;
-        let index = move |request: HttpRequest<ApiContextMut>| -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
-            let to_response = |request: HttpRequest<ApiContextMut>| -> Result<HttpResponse, actix_web::Error> {
-                let context = request.state();
-                let query: Query<Q> = Query::from_request(&request, &())?;
-                let value = (spec.handler)(context, query.into_inner())?;
-                Ok(HttpResponse::Ok().json(value))
-            };
+impl EndpointHandler {
+    pub fn new<Q, R>(name: &'static str, kind: EndpointKind<Q, R>) -> EndpointHandler 
+        where
+        Q: DeserializeOwned + 'static,
+        R: Serialize + 'static,
+    {
+        let (method, handler) = match kind {
+            EndpointKind::Immutable(f) => {
+                let index = move |request: HttpRequest<ApiContextMut>| -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
+                    let to_response = |request: HttpRequest<ApiContextMut>| -> Result<HttpResponse, actix_web::Error> {
+                        let context = request.state();
+                        let query: Query<Q> = Query::from_request(&request, &())?;
+                        let value = f(context, query.into_inner())?;
+                        Ok(HttpResponse::Ok().json(value))
+                    };
 
-            Box::new(to_response(request).into_future())
+                    Box::new(to_response(request).into_future())
+                };
+                let index = Box::new(index) as Box<WebRequestHandler>;
+                (actix_web::http::Method::GET, index)
+            }
+            EndpointKind::Mutable(handler) => {
+                let index = move |request: HttpRequest<ApiContextMut>| -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
+                    let context = request.state().clone();
+                    request.json().from_err().and_then(move |query: Q| {
+                        let value = (handler)(&context, query)?;
+                        Ok(HttpResponse::Ok().json(value))
+                    }).responder()
+                };
+                let index = Box::new(index) as Box<WebRequestHandler>;
+                (actix_web::http::Method::POST, index)
+            }
         };
 
         EndpointHandler {
-            name: name,
-            handler: Box::new(index),
-            method: actix_web::http::Method::GET,
-        }
-    }
-}
-
-impl<Q, R, F> From<EndpointMutSpec<Q, R, F>> for EndpointHandler
-where
-    Q: DeserializeOwned + 'static,
-    R: Serialize + 'static,
-    F: 'static + Clone,
-    for<'r> F: Fn(&'r ApiContextMut, Q) -> Result<R, error::Error>,
-{
-    fn from(spec: EndpointMutSpec<Q, R, F>) -> Self {
-        let name = spec.name;
-        let index = move |request: HttpRequest<ApiContextMut>| -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
-            let context = request.state().clone();
-            let handler = spec.handler.clone();
-            request.json().from_err().and_then(move |query: Q| {
-                let value = (handler)(&context, query)?;
-                Ok(HttpResponse::Ok().json(value))
-            }).responder()
-        };
-
-        EndpointHandler {
-            name: name,
-            handler: Box::new(index),
-            method: actix_web::http::Method::POST,
+            name,
+            method,
+            handler,
         }
     }
 }

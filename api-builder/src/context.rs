@@ -1,5 +1,4 @@
 use exonum::blockchain::Blockchain;
-use exonum::storage::Snapshot;
 
 use std::ops::Deref;
 

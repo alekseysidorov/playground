@@ -78,16 +78,15 @@ impl MyServiceApiMut for ApiContextMut {
 }
 
 fn api_aggregator(context: ApiContextMut) -> App<ApiContextMut> {
-    let endpoints = ServiceApiWebBackend::new()
-        .method("foo", MyServiceApi::foo)
-        .method("baz", MyServiceApi::baz)
-        .method_mut("bar", MyServiceApiMut::bar)
-        .endpoints();
+    let backend = ServiceApiWebBackend::new()
+        .endpoint("foo", MyServiceApi::foo)
+        .endpoint("baz", MyServiceApi::baz)
+        .endpoint_mut("bar", MyServiceApiMut::bar);
 
     App::with_state(context)
         .scope("api", |scope| {
             scope.nested("rustfest", |mut scope| {
-                for endpoint in endpoints {
+                for endpoint in backend.endpoints() {
                     scope = scope.route(endpoint.name, endpoint.method.clone(), move |request| {
                         (endpoint.handler)(request)
                     });
