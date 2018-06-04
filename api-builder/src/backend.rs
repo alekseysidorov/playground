@@ -5,7 +5,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use context::{ApiContext, ApiContextMut};
-use EndpointKind;
+use {Endpoint, EndpointKind, EndpointMut};
 
 pub type WebRequestHandler =
     Fn(HttpRequest<ApiContextMut>) -> Box<Future<Item = HttpResponse, Error = actix_web::Error>>;
@@ -36,20 +36,12 @@ pub trait ServiceApiBackend {
     type RawHandler;
     type Method;
 
-    fn endpoint<Q, R>(
-        self,
-        name: &'static str,
-        f: for<'r> fn(&'r ApiContext, Q) -> Result<R, failure::Error>,
-    ) -> Self
+    fn endpoint<Q, R>(self, name: &'static str, f: Endpoint<Q, R>) -> Self
     where
         Q: DeserializeOwned + 'static,
         R: Serialize + 'static;
 
-    fn endpoint_mut<Q, R>(
-        self,
-        name: &'static str,
-        f: for<'r> fn(&'r ApiContextMut, Q) -> Result<R, failure::Error>,
-    ) -> Self
+    fn endpoint_mut<Q, R>(self, name: &'static str, f: EndpointMut<Q, R>) -> Self
     where
         Q: DeserializeOwned + 'static,
         R: Serialize + 'static;
@@ -66,11 +58,7 @@ impl ServiceApiBackend for ServiceApiWebBackend {
     type RawHandler = Box<WebRequestHandler>;
     type Method = actix_web::http::Method;
 
-    fn endpoint<Q, R>(
-        mut self,
-        name: &'static str,
-        f: for<'r> fn(&'r ApiContext, Q) -> Result<R, failure::Error>,
-    ) -> Self
+    fn endpoint<Q, R>(mut self, name: &'static str, f: Endpoint<Q, R>) -> Self
     where
         Q: DeserializeOwned + 'static,
         R: Serialize + 'static,
@@ -80,11 +68,7 @@ impl ServiceApiBackend for ServiceApiWebBackend {
         self
     }
 
-    fn endpoint_mut<Q, R>(
-        mut self,
-        name: &'static str,
-        f: for<'r> fn(&'r ApiContextMut, Q) -> Result<R, failure::Error>,
-    ) -> Self
+    fn endpoint_mut<Q, R>(mut self, name: &'static str, f: EndpointMut<Q, R>) -> Self
     where
         Q: DeserializeOwned + 'static,
         R: Serialize + 'static,
@@ -110,8 +94,8 @@ impl ServiceApiBackend for ServiceApiWebBackend {
 }
 
 impl EndpointHandler {
-    pub fn new<Q, R>(name: &'static str, kind: EndpointKind<Q, R>) -> EndpointHandler 
-        where
+    pub fn new<Q, R>(name: &'static str, kind: EndpointKind<Q, R>) -> EndpointHandler
+    where
         Q: DeserializeOwned + 'static,
         R: Serialize + 'static,
     {

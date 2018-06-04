@@ -63,8 +63,7 @@ impl MyServiceApi for ApiContext {
 impl MyServiceApiMut for ApiContextMut {
     type Error = failure::Error;
 
-    fn bar(&self, request: Seed) -> Result<(u64, exonum::crypto::Hash), Self::Error>
-    {
+    fn bar(&self, request: Seed) -> Result<(u64, exonum::crypto::Hash), Self::Error> {
         let hash = exonum::crypto::hash(request.seed.as_bytes());
         let mut fork = self.blockchain.fork();
         let len = {
@@ -83,17 +82,16 @@ fn api_aggregator(context: ApiContextMut) -> App<ApiContextMut> {
         .endpoint("baz", MyServiceApi::baz)
         .endpoint_mut("bar", MyServiceApiMut::bar);
 
-    App::with_state(context)
-        .scope("api", |scope| {
-            scope.nested("rustfest", |mut scope| {
-                for endpoint in backend.endpoints() {
-                    scope = scope.route(endpoint.name, endpoint.method.clone(), move |request| {
-                        (endpoint.handler)(request)
-                    });
-                }
-                scope
-            })
+    App::with_state(context).scope("api", |scope| {
+        scope.nested("rustfest", |mut scope| {
+            for endpoint in backend.endpoints() {
+                scope = scope.route(endpoint.name, endpoint.method.clone(), move |request| {
+                    (endpoint.handler)(request)
+                });
+            }
+            scope
         })
+    })
 }
 
 fn main() {
