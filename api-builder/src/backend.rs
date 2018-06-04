@@ -1,6 +1,7 @@
 use actix_web::pred::*;
 use actix_web::{self, AsyncResponder, FromRequest, HttpMessage, HttpRequest, HttpResponse, Query};
 use futures::{Future, IntoFuture};
+use failure;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json;
@@ -45,13 +46,25 @@ pub trait ServiceApiBackend {
         F: 'static,
         for<'r> F: Fn(&'r ApiContext, Q) -> Result<R, error::Error>,
         E: Into<EndpointSpec<Q, R, F>>;
+
     fn endpoint_mut<Q, R, F, E>(self, endpoint: E) -> Self
     where
         Q: DeserializeOwned + 'static,
         R: Serialize + 'static,
         F: 'static + Clone,
         for<'r> F: Fn(&'r ApiContextMut, Q) -> Result<R, error::Error>,
-        E: Into<EndpointMutSpec<Q, R, F>>;    
+        E: Into<EndpointMutSpec<Q, R, F>>;
+
+    fn method<Q, R,>(self, name: &'static str, f: for<'r> fn(&'r ApiContext, Q) -> Result<R, failure::Error>) -> Self
+    where
+        Q: DeserializeOwned + 'static,
+        R: Serialize + 'static;
+
+    fn method_mut<Q, R,>(self, name: &'static str, f: for<'r> fn(&'r ApiContextMut, Q) -> Result<R, failure::Error>) -> Self
+    where
+        Q: DeserializeOwned + 'static,
+        R: Serialize + 'static;        
+
     fn raw_handler(
         self,
         name: &'static str,
@@ -90,6 +103,36 @@ impl ServiceApiBackend for ServiceApiWebBackend {
         self
     }
 
+    fn method<Q, R>(mut self, name: &'static str, f: for<'r> fn(&'r ApiContext, Q) -> Result<R, failure::Error>) -> Self
+    where
+        Q: DeserializeOwned + 'static,
+        R: Serialize + 'static
+    {
+        let spec = EndpointSpec {
+            name,
+            handler: f,
+            _query: ::std::marker::PhantomData,
+            _response: ::std::marker::PhantomData,            
+        };
+        self.endpoints.push(spec.into());
+        self        
+    }
+
+    fn method_mut<Q, R>(mut self, name: &'static str, f: for<'r> fn(&'r ApiContextMut, Q) -> Result<R, failure::Error>) -> Self
+    where
+        Q: DeserializeOwned + 'static,
+        R: Serialize + 'static
+    {
+        let spec = EndpointMutSpec {
+            name,
+            handler: f,
+            _query: ::std::marker::PhantomData,
+            _response: ::std::marker::PhantomData,            
+        };
+        self.endpoints.push(spec.into());
+        self        
+    }
+    
     fn raw_handler(
         mut self,
         name: &'static str,
@@ -154,7 +197,7 @@ where
         EndpointHandler {
             name: name,
             handler: Box::new(index),
-            method: actix_web::http::Method::GET,
+            method: actix_web::http::Method::POST,
         }
     }
 }

@@ -11,7 +11,6 @@ extern crate serde_urlencoded;
 use actix_web::*;
 use api_builder::backend::*;
 use api_builder::context::{ApiContext, ApiContextMut};
-use api_builder::*;
 
 use exonum::blockchain::Blockchain;
 
@@ -32,60 +31,60 @@ pub struct MyResponse {
     value: u64,
 }
 
-#[derive(Clone)]
-pub struct MyConcreteEndpoint;
-#[derive(Clone)]
-pub struct MyConcreteEndpoint2;
-#[derive(Clone)]
-pub struct MyConcreteEndpoint3;
+pub trait MyServiceApi {
+    type Error;
 
-impl Endpoint for MyConcreteEndpoint {
-    const NAME: &'static str = "foo";
+    fn foo(&self, request: MyRequest) -> Result<MyResponse, failure::Error>;
 
-    type Request = MyRequest;
-    type Response = MyResponse;
+    fn baz(&self, request: (String, String)) -> Result<String, failure::Error>;
+}
 
-    fn handle(
-        context: &ApiContext,
-        request: Self::Request,
-    ) -> Result<Self::Response, failure::Error> {
+pub trait MyServiceApiMut {
+    type Error;
+
+    fn bar(&self, Seed) -> Result<(u64, exonum::crypto::Hash), failure::Error>;
+}
+
+impl MyServiceApi for ApiContext {
+    type Error = failure::Error;
+
+    fn foo(&self, request: MyRequest) -> Result<MyResponse, Self::Error> {
         Ok(MyResponse {
             name: request.name,
             value: request.count * 2,
         })
     }
+
+    fn baz(&self, request: (String, String)) -> Result<String, Self::Error> {
+        Ok(format!("first is {}, second id {}", request.0, request.1))
+    }
 }
 
-impl EndpointMut for MyConcreteEndpoint2 {
-    const NAME: &'static str = "bar";
+impl MyServiceApiMut for ApiContextMut {
+    type Error = failure::Error;
 
-    type Request = Seed;
-    type Response = (u64, exonum::crypto::Hash);
-
-    fn handle(
-        context: &ApiContextMut,
-        request: Self::Request,
-    ) -> Result<Self::Response, failure::Error> {
+    fn bar(&self, request: Seed) -> Result<(u64, exonum::crypto::Hash), Self::Error>
+    {
         let hash = exonum::crypto::hash(request.seed.as_bytes());
-        let mut fork = context.blockchain.fork();
+        let mut fork = self.blockchain.fork();
         let len = {
             let mut index = exonum::storage::ListIndex::new("foo", &mut fork);
             index.push(hash);
             index.len()
         };
-        context.blockchain.clone().merge(fork.into_patch())?;
+        self.blockchain.clone().merge(fork.into_patch())?;
         Ok((len, hash))
     }
 }
 
 fn api_aggregator(context: ApiContextMut) -> App<ApiContextMut> {
     let endpoints = ServiceApiWebBackend::new()
-        .endpoint(MyConcreteEndpoint)
-        .endpoint_mut(MyConcreteEndpoint2)
+        .method("foo", MyServiceApi::foo)
+        .method("baz", MyServiceApi::baz)
+        .method_mut("bar", MyServiceApiMut::bar)
         .endpoints();
 
     App::with_state(context)
-        .prefix("aggregator")
         .scope("api", |scope| {
             scope.nested("rustfest", |mut scope| {
                 for endpoint in endpoints {
