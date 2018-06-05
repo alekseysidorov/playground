@@ -3,12 +3,12 @@ use futures::{Future, IntoFuture};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use context::{ApiContext, ApiContextMut};
 use error;
+use service::{ServiceApiContext, ServiceApiContextMut, ServiceApiBackend2};
 use {NamedFn, TypedFn};
 
-pub type WebRequestHandler =
-    Fn(HttpRequest<ApiContextMut>) -> Box<Future<Item = HttpResponse, Error = actix_web::Error>>;
+pub type WebRequestHandler = Fn(HttpRequest<ServiceApiContextMut>)
+    -> Box<Future<Item = HttpResponse, Error = actix_web::Error>>;
 
 pub struct EndpointHandler {
     pub name: &'static str,
@@ -64,7 +64,10 @@ impl ServiceApiBackend for ServiceApiWebBackend {
         E: Into<TypedFn<S, Q, I, R, F>>,
         EndpointHandler: From<NamedFn<S, Q, I, R, F>>,
     {
-        let named_fn = NamedFn { name, inner: f.into() };
+        let named_fn = NamedFn {
+            name,
+            inner: f.into(),
+        };
         self.endpoints.push(EndpointHandler::from(named_fn));
         self
     }
@@ -84,16 +87,16 @@ impl ServiceApiBackend for ServiceApiWebBackend {
     }
 }
 
-impl<Q, I, F> From<NamedFn<ApiContext, Q, I, Result<I, error::Error>, F>> for EndpointHandler
+impl<Q, I, F> From<NamedFn<ServiceApiContext, Q, I, Result<I, error::Error>, F>> for EndpointHandler
 where
-    F: for<'r> Fn(&'r ApiContext, Q) -> Result<I, error::Error> + 'static,
+    F: for<'r> Fn(&'r ServiceApiContext, Q) -> Result<I, error::Error> + 'static,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
-    fn from(f: NamedFn<ApiContext, Q, I, Result<I, error::Error>, F>) -> Self {
+    fn from(f: NamedFn<ServiceApiContext, Q, I, Result<I, error::Error>, F>) -> Self {
         let handler = f.inner.f;
-        let index = move |request: HttpRequest<ApiContextMut>| -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
-            let to_response = |request: HttpRequest<ApiContextMut>| -> Result<HttpResponse, actix_web::Error> {
+        let index = move |request: HttpRequest<ServiceApiContextMut>| -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
+            let to_response = |request: HttpRequest<ServiceApiContextMut>| -> Result<HttpResponse, actix_web::Error> {
                 let context = request.state();
                 let query: Query<Q> = Query::from_request(&request, &())?;
                 let value = handler(context, query.into_inner())?;
@@ -106,20 +109,21 @@ where
         EndpointHandler {
             name: f.name,
             method: actix_web::http::Method::GET,
-            handler: Box::new(index) as Box<WebRequestHandler>
+            handler: Box::new(index) as Box<WebRequestHandler>,
         }
     }
 }
 
-impl<Q, I, F> From<NamedFn<ApiContextMut, Q, I, Result<I, error::Error>, F>> for EndpointHandler
+impl<Q, I, F> From<NamedFn<ServiceApiContextMut, Q, I, Result<I, error::Error>, F>>
+    for EndpointHandler
 where
-    F: for<'r> Fn(&'r ApiContextMut, Q) -> Result<I, error::Error> + 'static + Clone,
+    F: for<'r> Fn(&'r ServiceApiContextMut, Q) -> Result<I, error::Error> + 'static + Clone,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
-    fn from(f: NamedFn<ApiContextMut, Q, I, Result<I, error::Error>, F>) -> Self {
+    fn from(f: NamedFn<ServiceApiContextMut, Q, I, Result<I, error::Error>, F>) -> Self {
         let handler = f.inner.f;
-        let index = move |request: HttpRequest<ApiContextMut>| -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
+        let index = move |request: HttpRequest<ServiceApiContextMut>| -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
             let handler = handler.clone();
             let context = request.state().clone();
             request.json().from_err().and_then(move |query: Q| {
@@ -131,7 +135,17 @@ where
         EndpointHandler {
             name: f.name,
             method: actix_web::http::Method::POST,
-            handler: Box::new(index) as Box<WebRequestHandler>
+            handler: Box::new(index) as Box<WebRequestHandler>,
         }
+    }
+}
+
+impl ServiceApiBackend2 for ServiceApiWebBackend {
+    type Handler = EndpointHandler;
+
+    fn raw_handler(mut self, handler: Self::Handler) -> Self 
+    {
+        self.endpoints.push(handler);
+        self
     }
 }

@@ -10,7 +10,7 @@ extern crate serde_urlencoded;
 
 use actix_web::*;
 use api_builder::backend::*;
-use api_builder::context::{ApiContext, ApiContextMut};
+use api_builder::service::{ServiceApiContext, ServiceApiContextMut};
 
 use exonum::blockchain::Blockchain;
 
@@ -45,7 +45,7 @@ pub trait MyServiceApiMut {
     fn bar(&self, Seed) -> Result<(u64, exonum::crypto::Hash), failure::Error>;
 }
 
-impl MyServiceApi for ApiContext {
+impl MyServiceApi for ServiceApiContext {
     type Error = failure::Error;
 
     fn foo(&self, request: MyRequest) -> Result<MyResponse, Self::Error> {
@@ -60,11 +60,11 @@ impl MyServiceApi for ApiContext {
     }
 }
 
-fn bara(ctx: &ApiContext, req: ()) -> Result<(), failure::Error> {
+fn bara(ctx: &ServiceApiContext, req: ()) -> Result<(), failure::Error> {
     unimplemented!()
 }
 
-impl MyServiceApiMut for ApiContextMut {
+impl MyServiceApiMut for ServiceApiContextMut {
     type Error = failure::Error;
 
     fn bar(&self, request: Seed) -> Result<(u64, exonum::crypto::Hash), Self::Error> {
@@ -80,11 +80,11 @@ impl MyServiceApiMut for ApiContextMut {
     }
 }
 
-fn api_aggregator(context: ApiContextMut) -> App<ApiContextMut> {
+fn api_aggregator(context: ServiceApiContextMut) -> App<ServiceApiContextMut> {
     let backend = ServiceApiWebBackend::new()
-        .endpoint("foo", <ApiContext as MyServiceApi>::foo)
-        .endpoint("baz", <ApiContext as MyServiceApi>::baz)
-        .endpoint("bar", <ApiContextMut as MyServiceApiMut>::bar)
+        .endpoint("foo", <ServiceApiContext as MyServiceApi>::foo)
+        .endpoint("baz", <ServiceApiContext as MyServiceApi>::baz)
+        .endpoint("bar", <ServiceApiContextMut as MyServiceApiMut>::bar)
         .endpoint("bara", bara);
 
     App::with_state(context).scope("api", |scope| {
@@ -108,7 +108,7 @@ fn main() {
         .unwrap();
     let blockchain = Blockchain::new(db, vec![], keypair.0, keypair.1, api_sender);
 
-    server::new(move || api_aggregator(ApiContextMut::new(blockchain.clone())))
+    server::new(move || api_aggregator(ServiceApiContextMut::new(blockchain.clone())))
         .bind("localhost:8080")
         .unwrap()
         .run()

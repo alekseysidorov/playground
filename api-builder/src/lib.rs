@@ -4,13 +4,12 @@ extern crate failure;
 extern crate futures;
 extern crate serde;
 extern crate serde_json;
-#[macro_use]
-extern crate static_assert_macro;
 
-use context::{ApiContext, ApiContextMut};
+use service::{ServiceApiContext, ServiceApiContextMut};
 
+pub mod actix_backend;
 pub mod backend;
-pub mod context;
+pub mod service;
 pub mod error;
 
 pub struct TypedFn<S, Q, I, R, F>
@@ -27,9 +26,9 @@ pub struct NamedFn<S, Q, I, R, F> {
     pub inner: TypedFn<S, Q, I, R, F>
 }
 
-impl<Q, I, F> From<F> for TypedFn<ApiContext, Q, I, Result<I, error::Error>, F>
+impl<Q, I, F> From<F> for TypedFn<ServiceApiContext, Q, I, Result<I, error::Error>, F>
 where
-    F: for<'r> Fn(&'r ApiContext, Q) -> Result<I, error::Error>,
+    F: for<'r> Fn(&'r ServiceApiContext, Q) -> Result<I, error::Error>,
 {
     fn from(f: F) -> Self {
         TypedFn {
@@ -42,9 +41,9 @@ where
     }
 }
 
-impl<Q, I, F> From<F> for TypedFn<ApiContextMut, Q, I, Result<I, error::Error>, F>
+impl<Q, I, F> From<F> for TypedFn<ServiceApiContextMut, Q, I, Result<I, error::Error>, F>
 where
-    F: for<'r> Fn(&'r ApiContextMut, Q) -> Result<I, error::Error>,
+    F: for<'r> Fn(&'r ServiceApiContextMut, Q) -> Result<I, error::Error>,
 {
     fn from(f: F) -> Self {
         TypedFn {
