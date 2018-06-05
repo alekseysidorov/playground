@@ -60,6 +60,10 @@ impl MyServiceApi for ApiContext {
     }
 }
 
+fn bara(ctx: &ApiContext, req: ()) -> Result<(), failure::Error> {
+    unimplemented!()
+}
+
 impl MyServiceApiMut for ApiContextMut {
     type Error = failure::Error;
 
@@ -78,9 +82,10 @@ impl MyServiceApiMut for ApiContextMut {
 
 fn api_aggregator(context: ApiContextMut) -> App<ApiContextMut> {
     let backend = ServiceApiWebBackend::new()
-        .endpoint("foo", MyServiceApi::foo)
-        .endpoint("baz", MyServiceApi::baz)
-        .endpoint_mut("bar", MyServiceApiMut::bar);
+        .endpoint("foo", <ApiContext as MyServiceApi>::foo)
+        .endpoint("baz", <ApiContext as MyServiceApi>::baz)
+        .endpoint("bar", <ApiContextMut as MyServiceApiMut>::bar)
+        .endpoint("bara", bara);
 
     App::with_state(context).scope("api", |scope| {
         scope.nested("rustfest", |mut scope| {
