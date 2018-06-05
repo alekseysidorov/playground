@@ -13,7 +13,7 @@ pub mod backend;
 pub mod context;
 pub mod error;
 
-pub struct TypedEndpoint<S, Q, I, R, F>
+pub struct TypedFn<S, Q, I, R, F>
 {
     f: F,
     _context_type: ::std::marker::PhantomData<S>,
@@ -22,12 +22,17 @@ pub struct TypedEndpoint<S, Q, I, R, F>
     _result_type: ::std::marker::PhantomData<R>,
 }
 
-impl<Q, I, F> From<F> for TypedEndpoint<ApiContext, Q, I, Result<I, error::Error>, F>
+pub struct NamedFn<S, Q, I, R, F> {
+    pub name: &'static str,
+    pub inner: TypedFn<S, Q, I, R, F>
+}
+
+impl<Q, I, F> From<F> for TypedFn<ApiContext, Q, I, Result<I, error::Error>, F>
 where
     F: for<'r> Fn(&'r ApiContext, Q) -> Result<I, error::Error>,
 {
     fn from(f: F) -> Self {
-        TypedEndpoint {
+        TypedFn {
             f,
             _context_type: ::std::marker::PhantomData,
             _query_type: ::std::marker::PhantomData,
@@ -37,12 +42,12 @@ where
     }
 }
 
-impl<Q, I, F> From<F> for TypedEndpoint<ApiContextMut, Q, I, Result<I, error::Error>, F>
+impl<Q, I, F> From<F> for TypedFn<ApiContextMut, Q, I, Result<I, error::Error>, F>
 where
     F: for<'r> Fn(&'r ApiContextMut, Q) -> Result<I, error::Error>,
 {
     fn from(f: F) -> Self {
-        TypedEndpoint {
+        TypedFn {
             f,
             _context_type: ::std::marker::PhantomData,
             _query_type: ::std::marker::PhantomData,

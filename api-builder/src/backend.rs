@@ -1,12 +1,11 @@
 use actix_web::{self, AsyncResponder, FromRequest, HttpMessage, HttpRequest, HttpResponse, Query};
-use failure;
 use futures::{Future, IntoFuture};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use context::{ApiContext, ApiContextMut};
 use error;
-use TypedEndpoint;
+use {NamedFn, TypedFn};
 
 pub type WebRequestHandler =
     Fn(HttpRequest<ApiContextMut>) -> Box<Future<Item = HttpResponse, Error = actix_web::Error>>;
@@ -42,7 +41,8 @@ pub trait ServiceApiBackend {
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: for<'r> Fn(&'r S, Q) -> R + 'static + Clone,
-        E: Into<TypedEndpoint<S, Q, I, R, F>>;
+        E: Into<TypedFn<S, Q, I, R, F>>,
+        EndpointHandler: From<NamedFn<S, Q, I, R, F>>;
 
     fn raw_handler(
         self,
@@ -56,15 +56,16 @@ impl ServiceApiBackend for ServiceApiWebBackend {
     type RawHandler = Box<WebRequestHandler>;
     type Method = actix_web::http::Method;
 
-    fn endpoint<S, Q, I, R, F, E>(mut self, name: &'static str, e: E) -> Self
+    fn endpoint<S, Q, I, R, F, E>(mut self, name: &'static str, f: E) -> Self
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: for<'r> Fn(&'r S, Q) -> R + 'static + Clone,
-        E: Into<TypedEndpoint<S, Q, I, R, F>>,
+        E: Into<TypedFn<S, Q, I, R, F>>,
+        EndpointHandler: From<NamedFn<S, Q, I, R, F>>,
     {
-        let handler = EndpointHandler::from(e.into());
-        self.endpoints.push(handler);
+        let named_fn = NamedFn { name, inner: f.into() };
+        self.endpoints.push(EndpointHandler::from(named_fn));
         self
     }
 
@@ -83,24 +84,14 @@ impl ServiceApiBackend for ServiceApiWebBackend {
     }
 }
 
-impl<Q, I, F>
-    From<(
-        &'static str,
-        TypedEndpoint<ApiContext, Q, I, Result<I, error::Error>, F>,
-    )> for EndpointHandler
+impl<Q, I, F> From<NamedFn<ApiContext, Q, I, Result<I, error::Error>, F>> for EndpointHandler
 where
     F: for<'r> Fn(&'r ApiContext, Q) -> Result<I, error::Error> + 'static,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
-    fn from(
-        e: (
-            &'static str,
-            TypedEndpoint<ApiContext, Q, I, Result<I, error::Error>, F>,
-        ),
-    ) -> Self {
-        let handler = e.1.f;
-        let name = e.0;
+    fn from(f: NamedFn<ApiContext, Q, I, Result<I, error::Error>, F>) -> Self {
+        let handler = f.inner.f;
         let index = move |request: HttpRequest<ApiContextMut>| -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
             let to_response = |request: HttpRequest<ApiContextMut>| -> Result<HttpResponse, actix_web::Error> {
                 let context = request.state();
@@ -111,35 +102,23 @@ where
 
             Box::new(to_response(request).into_future())
         };
-        let handler = Box::new(index) as Box<WebRequestHandler>;
-        let method = actix_web::http::Method::GET;
 
         EndpointHandler {
-            name,
-            method,
-            handler,
+            name: f.name,
+            method: actix_web::http::Method::GET,
+            handler: Box::new(index) as Box<WebRequestHandler>
         }
     }
 }
 
-impl<Q, I, F>
-    From<(
-        &'static str,
-        TypedEndpoint<ApiContextMut, Q, I, Result<I, error::Error>, F>,
-    )> for EndpointHandler
+impl<Q, I, F> From<NamedFn<ApiContextMut, Q, I, Result<I, error::Error>, F>> for EndpointHandler
 where
     F: for<'r> Fn(&'r ApiContextMut, Q) -> Result<I, error::Error> + 'static + Clone,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
-    fn from(
-        e: (
-            &'static str,
-            TypedEndpoint<ApiContextMut, Q, I, Result<I, error::Error>, F>,
-        ),
-    ) -> Self {
-        let handler = e.1.f;
-        let name = e.0;
+    fn from(f: NamedFn<ApiContextMut, Q, I, Result<I, error::Error>, F>) -> Self {
+        let handler = f.inner.f;
         let index = move |request: HttpRequest<ApiContextMut>| -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
             let handler = handler.clone();
             let context = request.state().clone();
@@ -148,20 +127,11 @@ where
                 Ok(HttpResponse::Ok().json(value))
             }).responder()
         };
-        let handler = Box::new(index) as Box<WebRequestHandler>;
-        let method = actix_web::http::Method::POST;
 
         EndpointHandler {
-            name,
-            method,
-            handler,
+            name: f.name,
+            method: actix_web::http::Method::POST,
+            handler: Box::new(index) as Box<WebRequestHandler>
         }
-    }
-}
-
-impl<S, Q, I, R, F> From<TypedEndpoint<S, Q, I, R, F>> for EndpointHandler {
-    fn from(_: TypedEndpoint<S, Q, I, R, F>) -> Self {
-        static_assert!(false);
-        unimplemented!();
     }
 }
