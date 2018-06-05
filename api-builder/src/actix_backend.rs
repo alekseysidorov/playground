@@ -22,25 +22,27 @@ where
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
-        fn from(f: NamedFn<ServiceApiContext, Q, I, Result<I, error::Error>, F>) -> Self {
-            let handler = f.inner.f;
-            let index = move |request: HttpRequest<ServiceApiContextMut>| -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
-                    let to_response = |request: HttpRequest<ServiceApiContextMut>| -> Result<HttpResponse, actix_web::Error> {
-                        let context = request.state();
-                        let query: Query<Q> = Query::from_request(&request, &())?;
-                        let value = handler(context, query.into_inner())?;
-                        Ok(HttpResponse::Ok().json(value))
-                    };
+    fn from(f: NamedFn<ServiceApiContext, Q, I, Result<I, error::Error>, F>) -> Self {
+        let handler = f.inner.f;
+        let index = move |request: HttpRequest<ServiceApiContextMut>|
+         -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
+            let to_response = |request: HttpRequest<ServiceApiContextMut>|
+             -> Result<HttpResponse, actix_web::Error> {
+                let context = request.state();
+                let query: Query<Q> = Query::from_request(&request, &())?;
+                let value = handler(context, query.into_inner())?;
+                Ok(HttpResponse::Ok().json(value))
+            };
 
-                    Box::new(to_response(request).into_future())
-                };
+            Box::new(to_response(request).into_future())
+        };
 
-            RequestHandler {
-                name: f.name,
-                method: actix_web::http::Method::GET,
-                inner: Box::new(index) as Box<RawHandler>,
-            }
+        RequestHandler {
+            name: f.name,
+            method: actix_web::http::Method::GET,
+            inner: Box::new(index) as Box<RawHandler>,
         }
+    }
 }
 
 impl<Q, I, F> From<NamedFn<ServiceApiContextMut, Q, I, Result<I, error::Error>, F>>
@@ -52,7 +54,8 @@ where
 {
     fn from(f: NamedFn<ServiceApiContextMut, Q, I, Result<I, error::Error>, F>) -> Self {
         let handler = f.inner.f;
-        let index = move |request: HttpRequest<ServiceApiContextMut>| -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
+        let index = move |request: HttpRequest<ServiceApiContextMut>|
+         -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
             let handler = handler.clone();
             let context = request.state().clone();
             request.json().from_err().and_then(move |query: Q| {
