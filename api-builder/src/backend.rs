@@ -100,12 +100,12 @@ impl EndpointHandler {
         R: Serialize + 'static,
     {
         let (method, handler) = match kind {
-            EndpointKind::Immutable(f) => {
+            EndpointKind::Immutable(handler) => {
                 let index = move |request: HttpRequest<ApiContextMut>| -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
                     let to_response = |request: HttpRequest<ApiContextMut>| -> Result<HttpResponse, actix_web::Error> {
                         let context = request.state();
                         let query: Query<Q> = Query::from_request(&request, &())?;
-                        let value = f(context, query.into_inner())?;
+                        let value = handler(context, query.into_inner())?;
                         Ok(HttpResponse::Ok().json(value))
                     };
 
@@ -118,7 +118,7 @@ impl EndpointHandler {
                 let index = move |request: HttpRequest<ApiContextMut>| -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
                     let context = request.state().clone();
                     request.json().from_err().and_then(move |query: Q| {
-                        let value = (handler)(&context, query)?;
+                        let value = handler(&context, query)?;
                         Ok(HttpResponse::Ok().json(value))
                     }).responder()
                 };
