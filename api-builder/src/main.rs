@@ -9,8 +9,7 @@ extern crate futures;
 extern crate serde_urlencoded;
 
 use actix_web::*;
-use api_builder::backend::*;
-use api_builder::service::{ServiceApiContext, ServiceApiContextMut};
+use api_builder::service::{Service, ServiceApiContext, ServiceApiContextMut, ServiceApiInitializer};
 
 use exonum::blockchain::Blockchain;
 
@@ -60,10 +59,6 @@ impl MyServiceApi for ServiceApiContext {
     }
 }
 
-fn bara(ctx: &ServiceApiContext, req: ()) -> Result<(), failure::Error> {
-    unimplemented!()
-}
-
 impl MyServiceApiMut for ServiceApiContextMut {
     type Error = failure::Error;
 
@@ -80,18 +75,30 @@ impl MyServiceApiMut for ServiceApiContextMut {
     }
 }
 
+pub struct MyService;
+
+impl Service for MyService {
+    fn initialize_api(&self, initializer: &mut ServiceApiInitializer) {
+        let public_api = initializer.public_api();
+        public_api
+            .endpoint("foo", <ServiceApiContext as MyServiceApi>::foo)
+            .endpoint("baz", <ServiceApiContext as MyServiceApi>::baz)
+            .endpoint("bar", <ServiceApiContextMut as MyServiceApiMut>::bar);
+    }
+}
+
 fn api_aggregator(context: ServiceApiContextMut) -> App<ServiceApiContextMut> {
-    let backend = ServiceApiWebBackend::new()
-        .endpoint("foo", <ServiceApiContext as MyServiceApi>::foo)
-        .endpoint("baz", <ServiceApiContext as MyServiceApi>::baz)
-        .endpoint("bar", <ServiceApiContextMut as MyServiceApiMut>::bar)
-        .endpoint("bara", bara);
+    let mut initalizer = ServiceApiInitializer::default();
+
+    let service = MyService;
+    service.initialize_api(&mut initalizer);
 
     App::with_state(context).scope("api", |scope| {
         scope.nested("rustfest", |mut scope| {
-            for endpoint in backend.endpoints() {
+            let endpoints = initalizer.public_api_builder.web_backend.finish();
+            for endpoint in endpoints {
                 scope = scope.route(endpoint.name, endpoint.method.clone(), move |request| {
-                    (endpoint.handler)(request)
+                    (endpoint.inner)(request)
                 });
             }
             scope

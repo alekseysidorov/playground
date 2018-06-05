@@ -8,12 +8,10 @@ extern crate serde_json;
 use service::{ServiceApiContext, ServiceApiContextMut};
 
 pub mod actix_backend;
-pub mod backend;
-pub mod service;
 pub mod error;
+pub mod service;
 
-pub struct TypedFn<S, Q, I, R, F>
-{
+pub struct TypedFn<S, Q, I, R, F> {
     f: F,
     _context_type: ::std::marker::PhantomData<S>,
     _query_type: ::std::marker::PhantomData<Q>,
@@ -23,7 +21,7 @@ pub struct TypedFn<S, Q, I, R, F>
 
 pub struct NamedFn<S, Q, I, R, F> {
     pub name: &'static str,
-    pub inner: TypedFn<S, Q, I, R, F>
+    pub inner: TypedFn<S, Q, I, R, F>,
 }
 
 impl<Q, I, F> From<F> for TypedFn<ServiceApiContext, Q, I, Result<I, error::Error>, F>
