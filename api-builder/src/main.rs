@@ -48,6 +48,11 @@ pub trait MyServiceApiMut {
     type Error;
 
     fn bar(&self, Seed) -> Result<(u64, exonum::crypto::Hash), Self::Error>;
+
+    fn bar_async(
+        &self,
+        Seed,
+    ) -> Box<Future<Item = (u64, exonum::crypto::Hash), Error = Self::Error>>;
 }
 
 impl MyServiceApi for ServiceApiContext {
@@ -88,6 +93,15 @@ impl MyServiceApiMut for ServiceApiContextMut {
         self.blockchain.clone().merge(fork.into_patch())?;
         Ok((len, hash))
     }
+
+    fn bar_async(
+        &self,
+        request: Seed,
+    ) -> Box<Future<Item = (u64, exonum::crypto::Hash), Error = Self::Error>> {
+        let self_ = self.clone();
+        let future = futures::lazy(move || self_.bar(request));
+        Box::new(future)
+    }
 }
 
 pub struct MyService;
@@ -103,7 +117,11 @@ impl Service for MyService {
                 <ServiceApiContext as MyServiceApi>::hello_async,
             )
             .endpoint("baz", <ServiceApiContext as MyServiceApi>::baz)
-            .endpoint("bar", <ServiceApiContextMut as MyServiceApiMut>::bar);
+            .endpoint("bar", <ServiceApiContextMut as MyServiceApiMut>::bar)
+            .endpoint(
+                "bar_async",
+                <ServiceApiContextMut as MyServiceApiMut>::bar_async,
+            );
     }
 }
 

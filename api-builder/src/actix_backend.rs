@@ -75,13 +75,18 @@ where
     }
 }
 
-impl<Q, I, F> From<NamedFn<ServiceApiContext, Q, I, Box<Future<Item=I, Error=error::Error>>, F>> for RequestHandler
+impl<Q, I, F> From<NamedFn<ServiceApiContext, Q, I, Box<Future<Item = I, Error = error::Error>>, F>>
+    for RequestHandler
 where
-    F: for<'r> Fn(&'r ServiceApiContext, Q) -> Box<Future<Item=I, Error=error::Error>> + 'static + Clone,
+    F: for<'r> Fn(&'r ServiceApiContext, Q) -> Box<Future<Item = I, Error = error::Error>>
+        + 'static
+        + Clone,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
-    fn from(f: NamedFn<ServiceApiContext, Q, I, Box<Future<Item=I, Error=error::Error>>, F>) -> Self {
+    fn from(
+        f: NamedFn<ServiceApiContext, Q, I, Box<Future<Item = I, Error = error::Error>>, F>,
+    ) -> Self {
         let handler = f.inner.f;
         let index = move |request: HttpRequest<ServiceApiContextMut>|
          -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
@@ -98,6 +103,43 @@ where
         RequestHandler {
             name: f.name,
             method: actix_web::http::Method::GET,
+            inner: Box::new(index) as Box<RawHandler>,
+        }
+    }
+}
+
+impl<Q, I, F>
+    From<NamedFn<ServiceApiContextMut, Q, I, Box<Future<Item = I, Error = error::Error>>, F>>
+    for RequestHandler
+where
+    F: for<'r> Fn(&'r ServiceApiContextMut, Q) -> Box<Future<Item = I, Error = error::Error>>
+        + 'static
+        + Clone,
+    Q: DeserializeOwned + 'static,
+    I: Serialize + 'static,
+{
+    fn from(
+        f: NamedFn<ServiceApiContextMut, Q, I, Box<Future<Item = I, Error = error::Error>>, F>,
+    ) -> Self {
+        let handler = f.inner.f;
+        let index = move |request: HttpRequest<ServiceApiContextMut>|
+         -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
+            let handler = handler.clone();
+            let context = request.state().clone();
+            request
+                .json()
+                .from_err()
+                .and_then(move |query: Q| {
+                    handler(&context, query)
+                        .map(|value| HttpResponse::Ok().json(value))
+                        .map_err(From::from)
+                })
+                .responder()
+        };
+
+        RequestHandler {
+            name: f.name,
+            method: actix_web::http::Method::POST,
             inner: Box::new(index) as Box<RawHandler>,
         }
     }

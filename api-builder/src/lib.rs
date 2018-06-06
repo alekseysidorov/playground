@@ -56,9 +56,10 @@ where
     }
 }
 
-impl<Q, I, F> From<F> for TypedFn<ServiceApiContext, Q, I, Box<Future<Item=I, Error=error::Error>>, F>
+impl<Q, I, F> From<F>
+    for TypedFn<ServiceApiContext, Q, I, Box<Future<Item = I, Error = error::Error>>, F>
 where
-    F: for<'r> Fn(&'r ServiceApiContext, Q) -> Box<Future<Item=I, Error=error::Error>>,
+    F: for<'r> Fn(&'r ServiceApiContext, Q) -> Box<Future<Item = I, Error = error::Error>>,
 {
     fn from(f: F) -> Self {
         TypedFn {
@@ -71,9 +72,10 @@ where
     }
 }
 
-impl<Q, I, F> From<F> for TypedFn<ServiceApiContextMut, Q, I, Box<Future<Item=I, Error=error::Error>>, F>
+impl<Q, I, F> From<F>
+    for TypedFn<ServiceApiContextMut, Q, I, Box<Future<Item = I, Error = error::Error>>, F>
 where
-    F: for<'r> Fn(&'r ServiceApiContextMut, Q) -> Box<Future<Item=I, Error=error::Error>>,
+    F: for<'r> Fn(&'r ServiceApiContextMut, Q) -> Box<Future<Item = I, Error = error::Error>>,
 {
     fn from(f: F) -> Self {
         TypedFn {
