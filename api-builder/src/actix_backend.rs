@@ -26,15 +26,13 @@ where
         let handler = f.inner.f;
         let index = move |request: HttpRequest<ServiceApiContextMut>|
          -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
-            let to_response = |request: HttpRequest<ServiceApiContextMut>|
-             -> Result<HttpResponse, actix_web::Error> {
-                let context = request.state();
-                let query: Query<Q> = Query::from_request(&request, &())?;
-                let value = handler(context, query.into_inner())?;
-                Ok(HttpResponse::Ok().json(value))
-            };
-
-            Box::new(to_response(request).into_future())
+            let context = request.state();
+            let future = Query::from_request(&request, &())
+                .map(|query: Query<Q>| query.into_inner())
+                .and_then(|query| handler(context, query).map_err(From::from))
+                .and_then(|value| Ok(HttpResponse::Ok().json(value)))
+                .into_future();
+            Box::new(future)
         };
 
         RequestHandler {
@@ -58,10 +56,15 @@ where
          -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
             let handler = handler.clone();
             let context = request.state().clone();
-            request.json().from_err().and_then(move |query: Q| {
-                let value = handler(&context, query)?;
-                Ok(HttpResponse::Ok().json(value))
-            }).responder()
+            request
+                .json()
+                .from_err()
+                .and_then(move |query: Q| {
+                    handler(&context, query)
+                        .map(|value| HttpResponse::Ok().json(value))
+                        .map_err(From::from)
+                })
+                .responder()
         };
 
         RequestHandler {
