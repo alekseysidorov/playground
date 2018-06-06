@@ -9,6 +9,8 @@ extern crate futures;
 extern crate serde_urlencoded;
 
 use actix_web::*;
+use futures::Future;
+
 use api_builder::service::{Service, ServiceApiContext, ServiceApiContextMut, ServiceApiInitializer};
 
 use exonum::blockchain::Blockchain;
@@ -33,15 +35,19 @@ pub struct MyResponse {
 pub trait MyServiceApi {
     type Error;
 
-    fn foo(&self, request: MyRequest) -> Result<MyResponse, failure::Error>;
+    fn foo(&self, request: MyRequest) -> Result<MyResponse, Self::Error>;
 
-    fn baz(&self, request: (String, String)) -> Result<String, failure::Error>;
+    fn baz(&self, request: (String, String)) -> Result<String, Self::Error>;
+
+    fn hello(&self, request: ()) -> Result<String, Self::Error>;
+
+    fn hello_async(&self, request: ()) -> Box<Future<Item = String, Error = Self::Error>>;
 }
 
 pub trait MyServiceApiMut {
     type Error;
 
-    fn bar(&self, Seed) -> Result<(u64, exonum::crypto::Hash), failure::Error>;
+    fn bar(&self, Seed) -> Result<(u64, exonum::crypto::Hash), Self::Error>;
 }
 
 impl MyServiceApi for ServiceApiContext {
@@ -56,6 +62,15 @@ impl MyServiceApi for ServiceApiContext {
 
     fn baz(&self, request: (String, String)) -> Result<String, Self::Error> {
         Ok(format!("first is {}, second id {}", request.0, request.1))
+    }
+
+    fn hello(&self, _: ()) -> Result<String, failure::Error> {
+        Ok("Hello Actix".to_owned())
+    }
+
+    fn hello_async(&self, _: ()) -> Box<Future<Item = String, Error = Self::Error>> {
+        let future = futures::lazy(|| Ok("Hello async response".to_owned()));
+        Box::new(future)
     }
 }
 
@@ -82,6 +97,11 @@ impl Service for MyService {
         let public_api = initializer.public_api();
         public_api
             .endpoint("foo", <ServiceApiContext as MyServiceApi>::foo)
+            .endpoint("hello", <ServiceApiContext as MyServiceApi>::hello)
+            .endpoint(
+                "hello_async",
+                <ServiceApiContext as MyServiceApi>::hello_async,
+            )
             .endpoint("baz", <ServiceApiContext as MyServiceApi>::baz)
             .endpoint("bar", <ServiceApiContextMut as MyServiceApiMut>::bar);
     }

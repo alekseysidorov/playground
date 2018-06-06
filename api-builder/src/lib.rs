@@ -5,6 +5,8 @@ extern crate futures;
 extern crate serde;
 extern crate serde_json;
 
+use futures::Future;
+
 use service::{ServiceApiContext, ServiceApiContextMut};
 
 pub mod actix_backend;
@@ -42,6 +44,36 @@ where
 impl<Q, I, F> From<F> for TypedFn<ServiceApiContextMut, Q, I, Result<I, error::Error>, F>
 where
     F: for<'r> Fn(&'r ServiceApiContextMut, Q) -> Result<I, error::Error>,
+{
+    fn from(f: F) -> Self {
+        TypedFn {
+            f,
+            _context_type: ::std::marker::PhantomData,
+            _query_type: ::std::marker::PhantomData,
+            _item_type: ::std::marker::PhantomData,
+            _result_type: ::std::marker::PhantomData,
+        }
+    }
+}
+
+impl<Q, I, F> From<F> for TypedFn<ServiceApiContext, Q, I, Box<Future<Item=I, Error=error::Error>>, F>
+where
+    F: for<'r> Fn(&'r ServiceApiContext, Q) -> Box<Future<Item=I, Error=error::Error>>,
+{
+    fn from(f: F) -> Self {
+        TypedFn {
+            f,
+            _context_type: ::std::marker::PhantomData,
+            _query_type: ::std::marker::PhantomData,
+            _item_type: ::std::marker::PhantomData,
+            _result_type: ::std::marker::PhantomData,
+        }
+    }
+}
+
+impl<Q, I, F> From<F> for TypedFn<ServiceApiContextMut, Q, I, Box<Future<Item=I, Error=error::Error>>, F>
+where
+    F: for<'r> Fn(&'r ServiceApiContextMut, Q) -> Box<Future<Item=I, Error=error::Error>>,
 {
     fn from(f: F) -> Self {
         TypedFn {

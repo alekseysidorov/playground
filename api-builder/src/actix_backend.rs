@@ -75,6 +75,34 @@ where
     }
 }
 
+impl<Q, I, F> From<NamedFn<ServiceApiContext, Q, I, Box<Future<Item=I, Error=error::Error>>, F>> for RequestHandler
+where
+    F: for<'r> Fn(&'r ServiceApiContext, Q) -> Box<Future<Item=I, Error=error::Error>> + 'static + Clone,
+    Q: DeserializeOwned + 'static,
+    I: Serialize + 'static,
+{
+    fn from(f: NamedFn<ServiceApiContext, Q, I, Box<Future<Item=I, Error=error::Error>>, F>) -> Self {
+        let handler = f.inner.f;
+        let index = move |request: HttpRequest<ServiceApiContextMut>|
+         -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
+            let context = request.state().clone();
+            let handler = handler.clone();
+            Query::from_request(&request, &())
+                .map(move |query: Query<Q>| query.into_inner())
+                .into_future()
+                .and_then(move |query| handler(&context, query).map_err(From::from))
+                .map(|value| HttpResponse::Ok().json(value))
+                .responder()
+        };
+
+        RequestHandler {
+            name: f.name,
+            method: actix_web::http::Method::GET,
+            inner: Box::new(index) as Box<RawHandler>,
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct BackendBuilder {
     handlers: Vec<RequestHandler>,
