@@ -14,7 +14,7 @@ pub mod error;
 pub mod service;
 
 pub type Result<I> = ::std::result::Result<I, error::Error>;
-pub type AsyncResult<I> = Box<Future<Item = I, Error = error::Error>>;
+pub type FutureResult<I> = Box<Future<Item = I, Error = error::Error>>;
 
 pub struct TypedFn<S, Q, I, R, F> {
     pub(crate) f: F,
@@ -59,10 +59,9 @@ where
     }
 }
 
-impl<Q, I, F> From<F>
-    for TypedFn<ServiceApiContext, Q, I, AsyncResult<I>, F>
+impl<Q, I, F> From<F> for TypedFn<ServiceApiContext, Q, I, FutureResult<I>, F>
 where
-    F: for<'r> Fn(&'r ServiceApiContext, Q) -> AsyncResult<I>,
+    F: for<'r> Fn(&'r ServiceApiContext, Q) -> FutureResult<I>,
 {
     fn from(f: F) -> Self {
         TypedFn {
@@ -75,10 +74,9 @@ where
     }
 }
 
-impl<Q, I, F> From<F>
-    for TypedFn<ServiceApiContextMut, Q, I, AsyncResult<I>, F>
+impl<Q, I, F> From<F> for TypedFn<ServiceApiContextMut, Q, I, FutureResult<I>, F>
 where
-    F: for<'r> Fn(&'r ServiceApiContextMut, Q) -> AsyncResult<I>,
+    F: for<'r> Fn(&'r ServiceApiContextMut, Q) -> FutureResult<I>,
 {
     fn from(f: F) -> Self {
         TypedFn {

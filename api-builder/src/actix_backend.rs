@@ -4,7 +4,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use service::{ServiceApiBackend, ServiceApiContext, ServiceApiContextMut};
-use {AsyncResult, NamedFn, Result};
+use {FutureResult, NamedFn, Result};
 
 pub type RawHandler = Fn(HttpRequest<ServiceApiContextMut>)
     -> Box<Future<Item = HttpResponse, Error = actix_web::Error>>;
@@ -97,13 +97,13 @@ where
     }
 }
 
-impl<Q, I, F> From<NamedFn<ServiceApiContext, Q, I, AsyncResult<I>, F>> for RequestHandler
+impl<Q, I, F> From<NamedFn<ServiceApiContext, Q, I, FutureResult<I>, F>> for RequestHandler
 where
-    F: for<'r> Fn(&'r ServiceApiContext, Q) -> AsyncResult<I> + 'static + Clone,
+    F: for<'r> Fn(&'r ServiceApiContext, Q) -> FutureResult<I> + 'static + Clone,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
-    fn from(f: NamedFn<ServiceApiContext, Q, I, AsyncResult<I>, F>) -> Self {
+    fn from(f: NamedFn<ServiceApiContext, Q, I, FutureResult<I>, F>) -> Self {
         let handler = f.inner.f;
         let index = move |request: HttpRequest<ServiceApiContextMut>|
          -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
@@ -125,13 +125,13 @@ where
     }
 }
 
-impl<Q, I, F> From<NamedFn<ServiceApiContextMut, Q, I, AsyncResult<I>, F>> for RequestHandler
+impl<Q, I, F> From<NamedFn<ServiceApiContextMut, Q, I, FutureResult<I>, F>> for RequestHandler
 where
-    F: for<'r> Fn(&'r ServiceApiContextMut, Q) -> AsyncResult<I> + 'static + Clone,
+    F: for<'r> Fn(&'r ServiceApiContextMut, Q) -> FutureResult<I> + 'static + Clone,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
-    fn from(f: NamedFn<ServiceApiContextMut, Q, I, AsyncResult<I>, F>) -> Self {
+    fn from(f: NamedFn<ServiceApiContextMut, Q, I, FutureResult<I>, F>) -> Self {
         let handler = f.inner.f;
         let index = move |request: HttpRequest<ServiceApiContextMut>|
          -> Box<Future<Item=HttpResponse, Error=actix_web::Error>> {
