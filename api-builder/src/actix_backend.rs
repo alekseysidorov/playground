@@ -1,18 +1,25 @@
-use actix_web::{self, AsyncResponder, FromRequest, HttpMessage, HttpRequest, HttpResponse, Query};
+use actix_web::{self, AsyncResponder, FromRequest, FutureResponse, HttpMessage, HttpRequest,
+                HttpResponse, Query};
 use futures::{Future, IntoFuture};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+
+use std::sync::Arc;
 
 use service::{ServiceApiBackend, ServiceApiContext, ServiceApiContextMut};
 use {FutureResult, NamedFn, Result};
 
 pub type RawHandler = Fn(HttpRequest<ServiceApiContextMut>)
-    -> Box<Future<Item = HttpResponse, Error = actix_web::Error>>;
+        -> FutureResponse<HttpResponse, actix_web::Error>
+    + 'static
+    + Send
+    + Sync;
 
+#[derive(Clone)]
 pub struct RequestHandler {
     pub name: &'static str,
     pub method: actix_web::http::Method,
-    pub inner: Box<RawHandler>,
+    pub inner: Arc<RawHandler>,
 }
 
 #[derive(Default)]
@@ -41,7 +48,7 @@ impl BackendBuilder {
 
 impl<Q, I, F> From<NamedFn<ServiceApiContext, Q, I, Result<I>, F>> for RequestHandler
 where
-    F: for<'r> Fn(&'r ServiceApiContext, Q) -> Result<I> + 'static,
+    F: for<'r> Fn(&'r ServiceApiContext, Q) -> Result<I> + 'static + Send + Sync,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
@@ -61,14 +68,14 @@ where
         RequestHandler {
             name: f.name,
             method: actix_web::http::Method::GET,
-            inner: Box::new(index) as Box<RawHandler>,
+            inner: Arc::from(index) as Arc<RawHandler>,
         }
     }
 }
 
 impl<Q, I, F> From<NamedFn<ServiceApiContextMut, Q, I, Result<I>, F>> for RequestHandler
 where
-    F: for<'r> Fn(&'r ServiceApiContextMut, Q) -> Result<I> + 'static + Clone,
+    F: for<'r> Fn(&'r ServiceApiContextMut, Q) -> Result<I> + 'static + Clone + Send + Sync,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
@@ -92,14 +99,14 @@ where
         RequestHandler {
             name: f.name,
             method: actix_web::http::Method::POST,
-            inner: Box::new(index) as Box<RawHandler>,
+            inner: Arc::from(index) as Arc<RawHandler>,
         }
     }
 }
 
 impl<Q, I, F> From<NamedFn<ServiceApiContext, Q, I, FutureResult<I>, F>> for RequestHandler
 where
-    F: for<'r> Fn(&'r ServiceApiContext, Q) -> FutureResult<I> + 'static + Clone,
+    F: for<'r> Fn(&'r ServiceApiContext, Q) -> FutureResult<I> + 'static + Clone + Send + Sync,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
@@ -120,14 +127,14 @@ where
         RequestHandler {
             name: f.name,
             method: actix_web::http::Method::GET,
-            inner: Box::new(index) as Box<RawHandler>,
+            inner: Arc::from(index) as Arc<RawHandler>,
         }
     }
 }
 
 impl<Q, I, F> From<NamedFn<ServiceApiContextMut, Q, I, FutureResult<I>, F>> for RequestHandler
 where
-    F: for<'r> Fn(&'r ServiceApiContextMut, Q) -> FutureResult<I> + 'static + Clone,
+    F: for<'r> Fn(&'r ServiceApiContextMut, Q) -> FutureResult<I> + 'static + Clone + Send + Sync,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
@@ -151,7 +158,7 @@ where
         RequestHandler {
             name: f.name,
             method: actix_web::http::Method::POST,
-            inner: Box::new(index) as Box<RawHandler>,
+            inner: Arc::from(index) as Arc<RawHandler>,
         }
     }
 }

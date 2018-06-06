@@ -15,6 +15,8 @@ use api_builder::service::{Service, ServiceApiContext, ServiceApiContextMut, Ser
 
 use exonum::blockchain::Blockchain;
 
+use std::sync::{Arc, Mutex};
+
 #[derive(Debug, Deserialize)]
 pub struct MyRequest {
     pub name: String,
@@ -106,9 +108,40 @@ impl MyServiceApiMut for ServiceApiContextMut {
 
 pub struct MyService;
 
+#[derive(Default, Clone)]
+pub struct SharedState {
+    count: Arc<Mutex<u64>>,
+}
+
+impl SharedState {
+    fn new() -> SharedState {
+        println!("Created shared state");
+        SharedState::default()
+    }
+
+    fn increment(&self) {
+        (*self.count.lock().unwrap()) += 1;
+    }
+
+    fn count(&self) -> u64 {
+        *self.count.lock().unwrap()
+    }
+}
+
 impl Service for MyService {
     fn initialize_api(&self, initializer: &mut ServiceApiInitializer) {
+        println!("Initialize api");
         let public_api = initializer.public_api();
+
+        let shared_state = SharedState::new();
+        let stateful_endpoint =
+            move |_: &ServiceApiContextMut, _: String| -> Result<(u64), failure::Error> {
+                let count = shared_state.count();
+                shared_state.increment();
+                println!("Increment shared state: {}", shared_state.count());
+                Ok(count)
+            };
+
         public_api
             .endpoint("foo", <ServiceApiContext as MyServiceApi>::foo)
             .endpoint("hello", <ServiceApiContext as MyServiceApi>::hello)
@@ -121,27 +154,9 @@ impl Service for MyService {
             .endpoint(
                 "bar_async",
                 <ServiceApiContextMut as MyServiceApiMut>::bar_async,
-            );
+            )
+            .endpoint("counter", stateful_endpoint);
     }
-}
-
-fn api_aggregator(context: ServiceApiContextMut) -> App<ServiceApiContextMut> {
-    let mut initalizer = ServiceApiInitializer::default();
-
-    let service = MyService;
-    service.initialize_api(&mut initalizer);
-
-    App::with_state(context).scope("api", |scope| {
-        scope.nested("rustfest", |mut scope| {
-            let endpoints = initalizer.public_api_builder.web_backend.finish();
-            for endpoint in endpoints {
-                scope = scope.route(endpoint.name, endpoint.method.clone(), move |request| {
-                    (endpoint.inner)(request)
-                });
-            }
-            scope
-        })
-    })
 }
 
 fn main() {
@@ -153,8 +168,30 @@ fn main() {
         .unwrap();
     let blockchain = Blockchain::new(db, vec![], keypair.0, keypair.1, api_sender);
 
-    server::new(move || api_aggregator(ServiceApiContextMut::new(blockchain.clone())))
-        .bind("localhost:8080")
+    let mut initalizer = ServiceApiInitializer::default();
+
+    let service = MyService;
+    service.initialize_api(&mut initalizer);
+
+    let endpoints = Arc::from(Mutex::from(
+        initalizer.public_api_builder.web_backend.finish(),
+    ));
+    let context = ServiceApiContextMut::new(blockchain.clone());
+    server::new(move || {
+        let context = context.clone();
+        let endpoints = endpoints.clone();
+        App::with_state(context).scope("api", move |scope| {
+            scope.nested("rustfest", move |mut scope| {
+                let endpoints = endpoints.lock().unwrap().clone();
+                for endpoint in endpoints {
+                    scope = scope.route(endpoint.name, endpoint.method.clone(), move |request| {
+                        (endpoint.inner)(request)
+                    });
+                }
+                scope
+            })
+        })
+    }).bind("localhost:8080")
         .unwrap()
         .run()
 }
