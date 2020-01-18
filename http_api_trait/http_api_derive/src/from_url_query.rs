@@ -65,7 +65,7 @@ impl ToTokens for FromUrlQuery {
 
         let tokens = quote! {
             impl http_api::FromUrlQuery for #ident {
-                fn from_str(query: &str) -> Result<Self, http_api::ParseQueryError> {
+                fn from_query_str(query: &str) -> Result<Self, http_api::ParseQueryError> {
                     #serde_wrapper
 
                     let wrapper: #serde_wrapper_ty = 
@@ -74,8 +74,6 @@ impl ToTokens for FromUrlQuery {
                     Ok(wrapper.into())
                 }
             }
-
-            #serde_wrapper
         };
         out.extend(tokens)
     }
@@ -88,6 +86,5 @@ pub fn impl_from_url_query(input: TokenStream) -> TokenStream {
         Err(e) => return e.write_errors().into(),
     };
     let tokens = quote! { #from_url_query };
-    println!("{}", tokens);
     tokens.into()
 }

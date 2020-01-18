@@ -8,5 +8,5 @@ pub mod export {
 }
 
 pub trait FromUrlQuery: Sized {
-    fn from_str(query: &str) -> Result<Self, ParseQueryError>;
+    fn from_query_str(query: &str) -> Result<Self, ParseQueryError>;
 }
