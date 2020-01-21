@@ -1,45 +1,67 @@
-use warp::{Filter};
+use http_api::{
+    warp_backend
+};
+use http_api_derive::FromUrlQuery;
+use warp::{reject::Reject, Filter};
 
-use std::{net::SocketAddr, future::Future};
+use std::{future::Future, net::SocketAddr};
+
+#[derive(Debug, FromUrlQuery)]
+struct Query {
+    first: String,
+    second: u64,
+}
+
+#[derive(Debug)]
+struct Error;
+
+impl Reject for Error {}
 
 trait PingInterface {
-    fn ping(&self) -> Result<String, String>;
+    fn ping(&self) -> Result<String, Error>;
 
-    fn pong(&self, param: String) -> Result<(), String>;
+    fn get(&self, query: Query) -> Result<(), Error>;
+
+    fn pong(&self, param: String) -> Result<(), Error>;
 }
 
 fn serve_ping_interface<T>(service: T, addr: impl Into<SocketAddr>) -> impl Future<Output = ()>
 where
     T: PingInterface + Clone + Send + Sync + 'static,
 {
-    let out = service.clone();
-    let ping = warp::get().and(warp::path("ping")).map(move || {
-        let value = out.ping().unwrap();
-        warp::reply::json(&value)
+    let ping = warp_backend::simple_get("ping", {
+        let out = service.clone();
+        move || out.ping()
     });
 
-    let out = service.clone();
-    let pong = warp::post()
-        .and(warp::path("pong"))
-        .and(warp::body::json())
-        .map(move |value| {
-            let value = out.pong(value);
-            warp::reply::json(&value)
-        });
+    let get = warp_backend::query_get("get", {
+        let out = service.clone();
+        move |query| out.get(query)
+    });
 
-    warp::serve(ping.or(pong)).run(addr.into())
+    let pong = warp_backend::params_post("pong", {
+        let out = service.clone();
+        move |query| out.pong(query)
+    });
+
+    warp::serve(ping.or(get).or(pong)).run(addr.into())
 }
 
 #[derive(Clone, Copy)]
 struct ServiceImpl;
 
 impl PingInterface for ServiceImpl {
-    fn ping(&self) -> Result<String, String> {
+    fn ping(&self) -> Result<String, Error> {
         Ok("foo".to_owned())
     }
 
-    fn pong(&self, param: String) -> Result<(), String> {
+    fn pong(&self, param: String) -> Result<(), Error> {
         eprintln!("{}", param);
+        Ok(())
+    }
+
+    fn get(&self, query: Query) -> Result<(), Error> {
+        eprintln!("{:?}", query);
         Ok(())
     }
 }
