@@ -68,9 +68,9 @@ impl ToTokens for FromUrlQuery {
                 fn from_query_str(query: &str) -> Result<Self, http_api::ParseQueryError> {
                     #serde_wrapper
 
-                    let wrapper: #serde_wrapper_ty = 
+                    let wrapper: #serde_wrapper_ty =
                         http_api::export::serde_urlencoded::from_str(query)?;
-                    
+
                     Ok(wrapper.into())
                 }
             }

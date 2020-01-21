@@ -1,5 +1,5 @@
-use http_api_derive::FromUrlQuery;
 use http_api::FromUrlQuery;
+use http_api_derive::FromUrlQuery;
 
 #[derive(FromUrlQuery)]
 struct MyQuery {

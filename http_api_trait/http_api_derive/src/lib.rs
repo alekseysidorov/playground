@@ -5,7 +5,7 @@ use proc_macro::TokenStream;
 mod from_url_query;
 mod http_api;
 
-#[proc_macro_derive(FromUrlQuery)]
+#[proc_macro_derive(FromUrlQuery, attributes(from_url_query))]
 pub fn from_url_query(input: TokenStream) -> TokenStream {
     from_url_query::impl_from_url_query(input)
 }

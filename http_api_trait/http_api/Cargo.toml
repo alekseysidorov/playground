@@ -11,3 +11,6 @@ http_api_derive = { path = "../http_api_derive" }
 serde_urlencoded = "0.6"
 serde_derive = "1.0"
 serde = "1.0"
+warp = "0.2"
+futures = "0.3"
+tokio = { version = "0.2", features = ["full"] }
