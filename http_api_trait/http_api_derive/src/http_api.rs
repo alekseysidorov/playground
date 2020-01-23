@@ -241,8 +241,8 @@ pub fn impl_http_api(attr: TokenStream, item: TokenStream) -> TokenStream {
         Err(e) => return e.write_errors().into(),
     };
 
-    let tokens = quote! { 
-        #item_trait 
+    let tokens = quote! {
+        #item_trait
         #api_definition
     };
 
