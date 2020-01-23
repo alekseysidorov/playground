@@ -1,10 +1,13 @@
-use http_api::warp_backend;
-use http_api_derive::FromUrlQuery;
-use warp::{reject::Reject, Filter};
+use http_api_derive::{http_api, http_api_endpoint, FromUrlQuery};
+use serde_derive::{Deserialize, Serialize};
+use warp::reject::Reject;
 
-use std::{future::Future, net::SocketAddr};
+use std::{
+    net::SocketAddr,
+    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
+};
 
-#[derive(Debug, FromUrlQuery)]
+#[derive(Debug, FromUrlQuery, Deserialize, Serialize)]
 struct Query {
     first: String,
     second: u64,
@@ -15,54 +18,64 @@ struct Error;
 
 impl Reject for Error {}
 
+#[http_api(warp = "serve_ping_interface")]
 trait PingInterface {
-    fn ping(&self) -> Result<String, Error>;
-
-    fn get(&self, query: Query) -> Result<(), Error>;
-
-    fn pong(&self, param: String) -> Result<(), Error>;
+    #[http_api_endpoint(method = "get")]
+    fn get(&self) -> Result<Query, Error>;
+    #[http_api_endpoint(method = "get")]
+    fn check(&self, query: Query) -> Result<bool, Error>;
+    #[http_api_endpoint(method = "post")]
+    fn set_value(&self, param: Query) -> Result<(), Error>;
+    #[http_api_endpoint(method = "post")]
+    fn increment(&self) -> Result<(), Error>;
 }
 
-fn serve_ping_interface<T>(
-    service: T,
-    addr: impl Into<std::net::SocketAddr>,
-) -> impl std::future::Future<Output = ()>
-where
-    T: PingInterface + Clone + Send + Sync + 'static,
-{
-    let ping = warp_backend::simple_get("ping", {
-        let out = service.clone();
-        move || out.ping()
-    });
-
-    let get = warp_backend::query_get("get", {
-        let out = service.clone();
-        move |query| out.get(query)
-    });
-
-    let pong = warp_backend::params_post("pong", {
-        let out = service.clone();
-        move |query| out.pong(query)
-    });
-
-    warp::serve(ping.or(get).or(pong)).run(addr.into())
+#[derive(Debug, Default)]
+struct ServiceInner {
+    first: String,
+    second: u64,
 }
 
-#[derive(Clone, Copy)]
-struct ServiceImpl;
+#[derive(Clone, Default)]
+struct ServiceImpl(Arc<RwLock<ServiceInner>>);
 
-impl PingInterface for ServiceImpl {
-    fn ping(&self) -> Result<String, Error> {
-        Ok("foo".to_owned())
+impl ServiceImpl {
+    fn new() -> Self {
+        Self::default()
     }
 
-    fn pong(&self, param: String) -> Result<(), Error> {
-        eprintln!("{}", param);
+    fn read(&self) -> RwLockReadGuard<ServiceInner> {
+        self.0.read().unwrap()
+    }
+
+    fn write(&self) -> RwLockWriteGuard<ServiceInner> {
+        self.0.write().unwrap()
+    }
+}
+
+impl PingInterface for ServiceImpl {
+    fn get(&self) -> Result<Query, Error> {
+        let inner = self.read();
+        Ok(Query {
+            first: inner.first.clone(),
+            second: inner.second,
+        })
+    }
+
+    fn check(&self, query: Query) -> Result<bool, Error> {
+        let inner = self.read();
+        Ok(inner.first == query.first && inner.second == query.second)
+    }
+
+    fn set_value(&self, param: Query) -> Result<(), Error> {
+        let mut inner = self.write();
+        inner.first = param.first;
+        inner.second = param.second;
         Ok(())
     }
 
-    fn get(&self, query: Query) -> Result<(), Error> {
-        eprintln!("{:?}", query);
+    fn increment(&self) -> Result<(), Error> {
+        self.write().second += 1;
         Ok(())
     }
 }
@@ -70,5 +83,5 @@ impl PingInterface for ServiceImpl {
 #[tokio::main]
 async fn main() {
     let addr: SocketAddr = "127.0.0.1:8080".parse().unwrap();
-    serve_ping_interface(ServiceImpl, addr).await
+    serve_ping_interface(ServiceImpl::new(), addr).await
 }

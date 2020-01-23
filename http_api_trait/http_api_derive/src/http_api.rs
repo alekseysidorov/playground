@@ -137,7 +137,7 @@ impl ParsedEndpoint {
                 quote! {
                     let #ident = http_api::warp_backend::simple_post(#path, {
                         let out = service.clone();
-                        move |query| out.#ident(query)
+                        move || out.#ident()
                     });
                 }
             }
@@ -209,7 +209,7 @@ impl ToTokens for ParsedApiDefinition {
         let mut tail = idents.into_iter();
         let head = tail.next().unwrap();
         let serve_impl = quote! {
-            #head #( .or(#tail) )* ;
+            #head #( .or(#tail) )*
         };
 
         let tokens = quote! {
@@ -220,9 +220,11 @@ impl ToTokens for ParsedApiDefinition {
             where
                 T: #interface + Clone + Send + Sync + 'static,
             {
+                use warp::Filter;
+
                 #( #handlers )*
 
-                #serve_impl
+                warp::serve(#serve_impl).run(addr.into())
             }
 
         };
