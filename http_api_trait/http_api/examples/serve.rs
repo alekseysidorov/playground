@@ -1,6 +1,4 @@
-use http_api::{
-    warp_backend
-};
+use http_api::warp_backend;
 use http_api_derive::FromUrlQuery;
 use warp::{reject::Reject, Filter};
 
@@ -25,7 +23,10 @@ trait PingInterface {
     fn pong(&self, param: String) -> Result<(), Error>;
 }
 
-fn serve_ping_interface<T>(service: T, addr: impl Into<SocketAddr>) -> impl Future<Output = ()>
+fn serve_ping_interface<T>(
+    service: T,
+    addr: impl Into<std::net::SocketAddr>,
+) -> impl std::future::Future<Output = ()>
 where
     T: PingInterface + Clone + Send + Sync + 'static,
 {

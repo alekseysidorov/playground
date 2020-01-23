@@ -1,6 +1,6 @@
 use darling::{self, FromMeta};
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::parse_macro_input;
 
 fn find_meta_attrs(name: &str, args: &[syn::Attribute]) -> Option<syn::NestedMeta> {
@@ -33,6 +33,11 @@ impl FromMeta for SupportedHttpMethod {
             other => Err(darling::Error::unknown_value(other)),
         }
     }
+}
+
+#[derive(Debug, FromMeta)]
+struct ApiAttrs {
+    warp: syn::Ident,
 }
 
 #[derive(Debug, FromMeta)]
@@ -97,16 +102,70 @@ impl ParsedEndpoint {
             attrs,
         })
     }
+
+    fn endpoint_path(&self) -> String {
+        self.attrs
+            .rename
+            .clone()
+            .unwrap_or_else(|| self.ident.to_string())
+    }
+
+    fn impl_endpoint_handler(&self) -> impl ToTokens {
+        let path = self.endpoint_path();
+        let ident = &self.ident;
+
+        match (&self.attrs.method, &self.arg) {
+            (SupportedHttpMethod::Get, None) => {
+                quote! {
+                    let #ident = http_api::warp_backend::simple_get(#path, {
+                        let out = service.clone();
+                        move || out.#ident()
+                    });
+                }
+            }
+
+            (SupportedHttpMethod::Get, Some(_arg)) => {
+                quote! {
+                    let #ident = http_api::warp_backend::query_get(#path, {
+                        let out = service.clone();
+                        move |query| out.#ident(query)
+                    });
+                }
+            }
+
+            (SupportedHttpMethod::Post, None) => {
+                quote! {
+                    let #ident = http_api::warp_backend::simple_post(#path, {
+                        let out = service.clone();
+                        move |query| out.#ident(query)
+                    });
+                }
+            }
+
+            (SupportedHttpMethod::Post, Some(_arg)) => {
+                quote! {
+                    let #ident = http_api::warp_backend::params_post(#path, {
+                        let out = service.clone();
+                        move |params| out.#ident(params)
+                    });
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
 struct ParsedApiDefinition {
     item_trait: syn::ItemTrait,
     endpoints: Vec<ParsedEndpoint>,
+    attrs: ApiAttrs,
 }
 
 impl ParsedApiDefinition {
-    fn parse(item_trait: syn::ItemTrait) -> Result<Self, darling::Error> {
+    fn parse(
+        item_trait: syn::ItemTrait,
+        attrs: &[syn::NestedMeta],
+    ) -> Result<Self, darling::Error> {
         let endpoints = item_trait
             .items
             .iter()
@@ -120,24 +179,70 @@ impl ParsedApiDefinition {
             .map(|method| ParsedEndpoint::parse(&method.sig, method.attrs.as_ref()))
             .collect::<Result<Vec<_>, darling::Error>>()?;
 
+        // Extract attributes.
+        let attrs = ApiAttrs::from_list(attrs)?;
+
         Ok(Self {
             item_trait,
             endpoints,
+            attrs,
         })
+    }
+}
+
+impl ToTokens for ParsedApiDefinition {
+    fn to_tokens(&self, out: &mut proc_macro2::TokenStream) {
+        let fn_name = &self.attrs.warp;
+        let interface = &self.item_trait.ident;
+
+        let (handlers, idents): (Vec<_>, Vec<_>) = self
+            .endpoints
+            .iter()
+            .map(|endpoint| {
+                let ident = &endpoint.ident;
+                let handler = endpoint.impl_endpoint_handler();
+
+                (handler, ident)
+            })
+            .unzip();
+
+        let mut tail = idents.into_iter();
+        let head = tail.next().unwrap();
+        let serve_impl = quote! {
+            #head #( .or(#tail) )* ;
+        };
+
+        let tokens = quote! {
+            fn #fn_name<T>(
+                service: T,
+                addr: impl Into<std::net::SocketAddr>,
+            ) -> impl std::future::Future<Output = ()>
+            where
+                T: #interface + Clone + Send + Sync + 'static,
+            {
+                #( #handlers )*
+
+                #serve_impl
+            }
+
+        };
+        out.extend(tokens)
     }
 }
 
 pub fn impl_http_api(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item_trait: syn::ItemTrait = parse_macro_input!(item);
-    let _attrs: syn::AttributeArgs = parse_macro_input!(attr);
+    let attrs: syn::AttributeArgs = parse_macro_input!(attr);
 
-    let api_definition = match ParsedApiDefinition::parse(item_trait.clone()) {
+    let api_definition = match ParsedApiDefinition::parse(item_trait.clone(), &attrs) {
         Ok(parsed) => parsed,
         Err(e) => return e.write_errors().into(),
     };
 
-    dbg!(&api_definition);
+    let tokens = quote! { 
+        #item_trait 
+        #api_definition
+    };
 
-    let tokens = quote! { #item_trait };
     tokens.into()
 }

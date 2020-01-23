@@ -1,6 +1,6 @@
 use http_api_derive::{http_api, http_api_endpoint};
 
-#[http_api(warp = "serve_api_interface")]
+#[http_api(warp = "impl_api_interface")]
 trait ApiInterface {
     #[http_api_endpoint(method = "get")]
     fn ping(&self) -> Result<(), String>;
