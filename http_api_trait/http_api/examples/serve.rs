@@ -1,6 +1,6 @@
 use http_api_derive::{http_api, http_api_endpoint, FromUrlQuery};
+use http_api::warp_backend::Error;
 use serde_derive::{Deserialize, Serialize};
-use warp::reject::Reject;
 
 use std::{
     net::SocketAddr,
@@ -12,11 +12,6 @@ struct Query {
     first: String,
     second: u64,
 }
-
-#[derive(Debug)]
-struct Error;
-
-impl Reject for Error {}
 
 #[http_api(warp = "serve_ping_interface")]
 trait PingInterface {

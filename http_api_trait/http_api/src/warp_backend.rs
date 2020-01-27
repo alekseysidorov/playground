@@ -4,6 +4,11 @@ use warp::{filters::BoxedFilter, reject::Reject, Filter};
 use super::FromUrlQuery;
 
 #[derive(Debug)]
+pub struct Error;
+
+impl Reject for Error {}
+
+#[derive(Debug)]
 pub struct IncorrectQuery;
 
 impl Reject for IncorrectQuery {}
