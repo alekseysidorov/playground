@@ -280,7 +280,7 @@ let from_url_query = match FromUrlQuery::from_derive_input(&input) {
 };
 ```
 
-Можно приступать к написанию кодогенератора. Чтобы не раздувать статью сверх меры, мы просто будем делегировать десериализацию URL query в `serde`. Но при этом спрячем `serde` настолько глубоко, чтобы он не просочился в обязательные зависимости. Мы будем создавать точную копию нашей структуры и выводить для нее `Deserialize`, а для реального парсинга запросов будем использовать крейт `serde_urlencoded`. Но чтобы пользователям не приходилось самим добавлять serde в зависимости, мы в основном крейте сделаем реэкспорты.
+Можно приступать к написанию кодогенератора. Чтобы не перегружать статью сверх меры, мы просто будем делегировать десериализацию URL query в `serde`. Но при этом спрячем `serde` настолько глубоко, чтобы он не просочился в обязательные зависимости. Мы будем создавать точную копию нашей структуры и выводить для нее `Deserialize`, а для реального парсинга запросов будем использовать крейт `serde_urlencoded`. Но чтобы пользователям не приходилось самим добавлять serde в зависимости, мы в основном крейте сделаем реэкспорты.
 
 ```rust
 #[doc(hidden)]
@@ -379,6 +379,8 @@ pub fn http_api_endpoint(_attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 ```
 
+## Разбираем методы интерфейсного трейта
+
 Для начала напишем код, который будет разбирать отдельный метод типажа с интерфейсом, который в общем случае будет выглядеть примерно так:
 
 ```rust
@@ -408,11 +410,6 @@ impl FromMeta for SupportedHttpMethod {
         }
     }
 }
-
-#[derive(Debug, FromMeta)]
-struct ApiAttrs {
-    warp: syn::Ident,
-}
 ```
 
 И объявим набор атрибутов для метода, которые мы можем указывать:
@@ -429,3 +426,381 @@ struct EndpointAttrs {
     rename: Option<String>,
 }
 ```
+
+Парсить мы будем сигнатуру функции, которая имеет тип `syn::Signature`, и в этом случае полностью
+положится на помощь darling'а мы уже не сможем: большую часть разбора синтаксического дерева придется
+писать самим, но вот атрибуты методов легко можно получить с помощью знакомого нам уже `FromMeta`.
+А чтобы среди атрибутов метода отыскать нужный нам `http_api_endpoint` мы напишем небольшую
+вспомогательную функцию. Мы будем преобразовывать тип нашего атрибута в `syn::NestedMeta` для того,
+чтобы была возможность обрабатывать вложенные метаданные вида `(foo = "bar", boo(first, second))`.
+
+```rust
+fn find_meta_attrs(name: &str, args: &[syn::Attribute]) -> Option<syn::NestedMeta> {
+    args.as_ref()
+        .iter()
+        .filter_map(|a| a.parse_meta().ok())
+        .find(|m| m.path().is_ident(name))
+        .map(syn::NestedMeta::from)
+}
+```
+
+Теперь можно переходить к разбору сигнатуры, как я уже упоминал выше: нам нужно рассмотреть
+два варианта: с дополнительным аргументом и без:
+
+```rust
+/// Вспомогательный метод для удобного создания ошибок.
+fn invalid_method(span: &impl syn::spanned::Spanned) -> darling::Error {
+    darling::Error::custom(
+        "API method should have one of `fn foo(&self) -> Result<Bar, Error>` or \
+         `fn foo(&self, arg: Foo) -> Result<Bar, Error>` form",
+    )
+    .with_span(span)
+}
+
+impl ParsedEndpoint {
+    fn parse(sig: &syn::Signature, attrs: &[syn::Attribute]) -> Result<Self, darling::Error> {
+        /// Создаем итератор с перечислением агрументов метода.
+        let mut args = sig.inputs.iter();
+
+        // Проверяем, что первый аргумент метода - это всегда &self и только он,
+        // никакие варианты в &mut self, или с &self: Arc<Self> мы поддерживать не будем.
+        if let Some(arg) = args.next() {
+            match arg {
+                // self в syn обозначается как Receiver.
+                syn::FnArg::Receiver(syn::Receiver {
+                    // Наличие reference говорит нам, что тип на самом деле &self.
+                    reference: Some(_),
+                    // А отсутствие mutability говорит о том, что в типе
+                    // не содержится никаких mut.
+                    mutability: None,
+                    ..
+                }) => {}
+                _ => {
+                    return Err(invalid_method(&arg));
+                }
+            }
+        } else {
+            return Err(invalid_method(&sig));
+        }
+
+        // Извлекаем опциональный тип параметра.
+        let arg = args
+            .next()
+            .map(|arg| match arg {
+                // FnArg может быть или Typed или Receiver, но receiver мы уже проверили
+                // на предыдущем шаге, поэтому достаточно просто извлечь тип аргумента и все.
+                syn::FnArg::Typed(arg) => Ok(arg.ty.clone()),
+                // Только первый аргумент может быть self'ом.
+                _ => unreachable!("Only first argument can be receiver."),
+            })
+            // Transpose очень удобная штука, которая превращает Option<Result<...>> в
+            // Result<Option<...>>, чем очень улучшает читабельность кода.
+            .transpose()?;
+
+        // Извлекаем тип возращаемого значения, он тоже должен быть Typed, а не Receiver.
+        let ret = match &sig.output {
+            syn::ReturnType::Type(_, ty) => Ok(ty.clone()),
+            _ => Err(invalid_method(&sig)),
+        }?;
+
+        // Функцией, которую мы писали выше, мы находим атрибуты относящиеся к нашему макросу.
+        // И с помощью FromMeta::from_nested_meta извлекаем метаданные.
+        let attrs = find_meta_attrs("http_api_endpoint", attrs)
+            .map(|meta| EndpointAttrs::from_nested_meta(&&meta))
+            .unwrap_or_else(|| Err(darling::Error::custom("todo")))?;
+
+        /// Все, парсинг сигнатуры метода готов и можно возращать значение.
+        Ok(Self {
+            ident: sig.ident.clone(),
+            arg,
+            ret,
+            attrs,
+        })
+    }
+}
+```
+
+## Разбираем интерфейсный трейт целиком
+
+Теперь можно приступить к разбору трейта с интерфейсом в целом. Типаж интерфейса всегда состоит
+исключительно из методов, разбор которых мы описали выше, и каких-то дополнительных атрибутов.
+Таким образом особых сложностей с его разбором не возникает.
+
+```rust
+
+/// Структура содержит исходный трейт, набор его атрибутов и список интерфейсных методов.
+#[derive(Debug)]
+struct ParsedApiDefinition {
+    /// Исходный трейт, который мы не трогаем и который дальше как есть передается в
+    /// исходящий поток токенов.
+    item_trait: syn::ItemTrait,
+    /// Список интерфейсных методов.
+    endpoints: Vec<ParsedEndpoint>,
+    /// Атрибуты интерфейсного типажа.
+    attrs: ApiAttrs,
+}
+
+#[derive(Debug, FromMeta)]
+struct ApiAttrs {
+    /// Данный атрибут определяет имя функции, которая будет монтировать реализацию интерфейса
+    /// к warp'у.
+    warp: syn::Ident,
+}
+
+impl ParsedApiDefinition {
+    fn parse(
+        item_trait: syn::ItemTrait,
+        attrs: &[syn::NestedMeta],
+    ) -> Result<Self, darling::Error> {
+        // С парсингом в данном случае все тривиально, среди итемов трейта мы фильтруем методы,
+        // которые разбираем с помощью кода, который мы написали выше.
+        let endpoints = item_trait
+            .items
+            .iter()
+            .filter_map(|item| {
+                if let syn::TraitItem::Method(method) = item {
+                    Some(method)
+                } else {
+                    None
+                }
+            })
+            .map(|method| ParsedEndpoint::parse(&method.sig, method.attrs.as_ref()))
+            .collect::<Result<Vec<_>, darling::Error>>()?;
+
+        // Парсим атрибуты трейта.
+        let attrs = ApiAttrs::from_list(attrs)?;
+
+        // И возращаем полностью разобранное описание HTTP API.
+        Ok(Self {
+            item_trait,
+            endpoints,
+            attrs,
+        })
+    }
+}
+```
+
+## Пишем удобную обертку warp фильтрами
+
+Чтобы написать кодогенерацию необходимо для начала разобраться с тем, как устроен warp и
+каким образом к нему подключаются обработчики запросов. Все в warp'е крутится вокруг концепции,
+которая называется `Filter`, фильтры можно комбинировать в цепочки при помощи комбинаторов `and`,
+`map`, `and_then`, где каждый наложенный фильтр конкретизирует то, как будет обрабатываться запрос.
+Например, если мы хотим просто написать обработчик запросов, который на GET запрос будет просто
+возращать некоторый json, то мы просто пишем что-то в таком стиле:
+
+```rust
+/// Мы оборачиваем некоторый обработчик, который просто отдает результат
+/// в фильтр warp'а
+pub fn simple_get<F, R, E>(name: &'static str, handler: F) -> JsonReply
+where
+    F: Fn() -> Result<R, E> + Clone + Send + Sync + 'static,
+    R: ser::Serialize,
+    E: Reject,
+{
+    // Создаем некоторый фильтр запросов, который принимает только GET запросы,
+    // а остальные игнорирует.
+    warp::get()
+        // Накладываем на него дополнительную фильтрацию, чтобы он принимал
+        // только запросы с путем {name}
+        .and(warp::path(name))
+        // А в последнем комбинаторе and_then мы вызываем обработчик и получившийся
+        // результат возращаем в виде json объекта
+        .and_then(move || {
+            let handler = handler.clone();
+            // Обработчик запросов в реальности всегда асинхронный, поэтому нам нужно
+            // обернуть наш синхронный вызов в async блок.
+            async move {
+                match handler() {
+                    Ok(value) => Ok(warp::reply::json(&value)),
+                    // В warp'е достаточно своеобразная система обработки ошибок,
+                    // но чтобы не перегружать статью, мы не будем касаться этого вопроса
+                    // подробно и просто передадим какой-то тип ошибки наверх.
+                    Err(e) => Err(warp::reject::custom(e)),
+                }
+            }
+        })
+        .boxed()
+}
+```
+
+Для случая с GET запросами с параметрами мы лишь немного изменим обертку, которую мы написали выше,
+добавив еще один фильтр в цепочку.
+
+```rust
+pub fn query_get<F, Q, R, E>(name: &'static str, handler: F) -> JsonReply
+where
+    F: Fn(Q) -> Result<R, E> + Clone + Send + Sync + 'static,
+    Q: FromUrlQuery,
+    R: ser::Serialize,
+    E: Reject,
+{
+    warp::get()
+        .and(warp::path(name))
+        // Добавляем в цепочку фильтров фильтрацию по URL query, который вернет нам
+        // строчку с необработанным query.
+        .and(warp::filters::query::raw())
+        .and_then(move |raw_query: String| {
+            let handler = handler.clone();
+            async move {
+                // Применим к строчке с запросом написанный нами ранее трейт FromUrlQuery
+                // и получим переменную с нужным обработчику запросов типом.
+                let query = Q::from_query_str(&raw_query)
+                    .map_err(|_| warp::reject::custom(IncorrectQuery))?;
+
+                match handler(query) {
+                    Ok(value) => Ok(warp::reply::json(&value)),
+                    Err(e) => Err(warp::reject::custom(e)),
+                }
+            }
+        })
+        .boxed()
+}
+```
+
+Обработчики остальных двух типов запросов пишутся точно так-же по аналогии.
+
+## Собираем обработчики воедино
+
+Помимо комбинаторов `and`, которое объединяет фильтры в цепочку, существует еще комбинатор
+`or`, которое позволяет выбирать из двух фильтров подходящий по ситуации, фактически, таким
+образом мы организовываем роутинг запросов, причем правила могут быть очень сложными.
+Давайте просто взглянем на пример из документации:
+
+```rust
+use std::net::SocketAddr;
+use warp::Filter;
+
+// В данном примере warp будет обрабатывать запросы вида `/:u32` или
+// `/:socketaddr`
+warp::path::param::<u32>()
+    .or(warp::path::param::<SocketAddr>());
+```
+
+И вот теперь мы можем приступить к генерации тела искомой функции
+`serve_ping_interface`. Для начала реализуем генерацию соответствующих
+warp фильтров для соответствующих методов трейта, где service это объект,
+реализующий бизнес-логику.
+
+```rust
+impl ParsedEndpoint {
+    fn impl_endpoint_handler(&self) -> impl ToTokens {
+        // Имя метода является используется в качестве пути.
+        let path = self.endpoint_path();
+        let ident = &self.ident;
+
+        // Перебираем все четыре варианта и с помощью оберток, описанных выше
+        // создаем соответствующие warp фильтры.
+        match (&self.attrs.method, &self.arg) {
+            (SupportedHttpMethod::Get, None) => {
+                quote! {
+                    let #ident = http_api::warp_backend::simple_get(#path, {
+                        let out = service.clone();
+                        move || out.#ident()
+                    });
+                }
+            }
+
+            (SupportedHttpMethod::Get, Some(_arg)) => {
+                quote! {
+                    let #ident = http_api::warp_backend::query_get(#path, {
+                        let out = service.clone();
+                        move |query| out.#ident(query)
+                    });
+                }
+            }
+
+            (SupportedHttpMethod::Post, None) => {
+                quote! {
+                    let #ident = http_api::warp_backend::simple_post(#path, {
+                        let out = service.clone();
+                        move || out.#ident()
+                    });
+                }
+            }
+
+            (SupportedHttpMethod::Post, Some(_arg)) => {
+                quote! {
+                    let #ident = http_api::warp_backend::params_post(#path, {
+                        let out = service.clone();
+                        move |params| out.#ident(params)
+                    });
+                }
+            }
+        }
+    }
+}
+```
+
+А теперь с помощью комбинатора `or` собираем все фильтры воедино.
+
+```rust
+impl ToTokens for ParsedApiDefinition {
+    fn to_tokens(&self, out: &mut proc_macro2::TokenStream) {
+        let fn_name = &self.attrs.warp;
+        let interface = &self.item_trait.ident;
+
+        // В первом массиве содержатся фильтры, а во втором массиве
+        // соответствющием им идентификаторы, в данном случае это
+        // имена методов интерфейсного типажа.
+        let (filters, idents): (Vec<_>, Vec<_>) = self
+            .endpoints
+            .iter()
+            .map(|endpoint| {
+                let ident = &endpoint.ident;
+                let handler = endpoint.impl_endpoint_handler();
+
+                (handler, ident)
+            })
+            .unzip();
+
+        let mut tail = idents.into_iter();
+        // Нам нужно собрать все фильтры в конструкцию вида
+        // `a.or(b).or(c).or(d)`, а для этого головной элемент
+        // следует обрабатывать отдельно, поэтому извлекаем его.
+        let head = tail.next().unwrap();
+        let serve_impl = quote! {
+            #head #( .or(#tail) )*
+        };
+
+        // Финальный аккорд: создаем искомую функцию.
+        let tokens = quote! {
+            fn #fn_name<T>(
+                service: T,
+                addr: impl Into<std::net::SocketAddr>,
+            ) -> impl std::future::Future<Output = ()>
+            where
+                T: #interface + Clone + Send + Sync + 'static,
+            {
+                use warp::Filter;
+
+                // Создаем фильтры для всех методов трейта.
+                #( #filters )*
+
+                // Комбинируем все фильтры в конечное API и запускаем
+                // warp сервер.
+                warp::serve(#serve_impl).run(addr.into())
+            }
+
+        };
+        out.extend(tokens)
+    }
+}
+```
+
+## Заключение
+
+С помощью этой статьи я хотел показать, что derive макросы не всегда так сложны в написании,
+если использовать дополнительные библиотеки и следовать определенным практикам.
+На мой взгляд, подобный подход к использованию трейтов наиболее удобен, если нужно описать
+некоторый RPC, связывающий различные приложения, которые написаны на Rust'е.
+Нетрудно заметить, что можно легко написать генератор реализации типажа-интерфейса для http
+клиентов типа reqwest и тем самым исключить возможность ошибиться в сопряжении клиента и сервера
+на корню.
+
+Никто не мешает при помощи макросов пойти дальше и выводить еще и openapi или swagger
+спецификацию для типажей-интерфейсов. Но в таком случае мне кажется, что лучше пойти другим путем и
+по спецификации написать генератор rust кода, это даст больший простор для маневров, а если писать этот
+генератор в виде build зависимости, то никто не мешает воспользоваться мощью `syn` и `quote` и в этом случае.
+
+Полностью рабочий код, примеры которого приводились в данной статье можно найти по этой ссылке, спасибо за внимание.

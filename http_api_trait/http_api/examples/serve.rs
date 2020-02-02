@@ -1,5 +1,5 @@
-use http_api_derive::{http_api, http_api_endpoint, FromUrlQuery};
 use http_api::warp_backend::Error;
+use http_api_derive::{http_api, http_api_endpoint, FromUrlQuery};
 use serde_derive::{Deserialize, Serialize};
 
 use std::{

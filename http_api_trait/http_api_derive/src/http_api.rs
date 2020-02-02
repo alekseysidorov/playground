@@ -87,7 +87,7 @@ impl ParsedEndpoint {
         // Extract return type.
         let ret = match &sig.output {
             syn::ReturnType::Type(_, ty) => Ok(ty.clone()),
-            _ => Err(invalid_method(&sig)),
+            _ => unreachable!("Only first argument can be receiver."),
         }?;
 
         // Extract attributes.
@@ -195,7 +195,7 @@ impl ToTokens for ParsedApiDefinition {
         let fn_name = &self.attrs.warp;
         let interface = &self.item_trait.ident;
 
-        let (handlers, idents): (Vec<_>, Vec<_>) = self
+        let (filters, idents): (Vec<_>, Vec<_>) = self
             .endpoints
             .iter()
             .map(|endpoint| {
@@ -222,7 +222,7 @@ impl ToTokens for ParsedApiDefinition {
             {
                 use warp::Filter;
 
-                #( #handlers )*
+                #( #filters )*
 
                 warp::serve(#serve_impl).run(addr.into())
             }
