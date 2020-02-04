@@ -92,7 +92,7 @@ impl ParsedEndpoint {
 
         // Extract attributes.
         let attrs = find_meta_attrs("http_api_endpoint", attrs)
-            .map(|meta| EndpointAttrs::from_nested_meta(&&meta))
+            .map(|meta| EndpointAttrs::from_nested_meta(&meta))
             .unwrap_or_else(|| Err(darling::Error::custom("todo")))?;
 
         Ok(Self {
