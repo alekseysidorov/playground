@@ -6,12 +6,6 @@ pub struct Graph {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub enum Distance {
-    Unreachable,
-    Reachable(usize),
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
 enum NodeColor {
     /// Unvisited node,
     White,
@@ -19,6 +13,12 @@ enum NodeColor {
     Gray,
     /// Visited node; all iterations with it are finished.
     Black,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum Distance {
+    Reachable(usize),
+    Unreachable,
 }
 
 impl Distance {
