@@ -1,2 +1,2 @@
 [workspace]
-members = ["graphs"]
+members = ["graphs", "data_structures"]
