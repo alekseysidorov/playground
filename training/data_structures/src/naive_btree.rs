@@ -34,7 +34,6 @@ impl<K: Ord, V> Ord for KeyValue<K, V> {
 #[derive(Default, Debug)]
 pub struct NaiveBTree<K: Ord, V> {
     root: Node<K, V>,
-    len: usize,
 }
 
 impl<K: Ord, V> NaiveBTree<K, V> {
@@ -46,8 +45,6 @@ impl<K: Ord, V> NaiveBTree<K, V> {
             mem::swap(&mut new_root, &mut self.root);
             self.root.children = vec![new_root, right];
         }
-
-        self.len += 1;
     }
 
     pub fn get<Q: ?Sized>(&self, key: &Q) -> Option<&V>
@@ -57,6 +54,23 @@ impl<K: Ord, V> NaiveBTree<K, V> {
     {
         self.root.find_key(key)
     }
+
+    pub fn remove<Q: ?Sized>(&mut self, key: &Q) -> Option<V>
+    where
+        K: Borrow<Q>,
+        Q: Ord,
+        K: std::fmt::Debug,
+        V: std::fmt::Debug,
+    {
+        let (value, state) = self.root.remove(key);
+        value
+    }
+}
+
+#[derive(Debug, PartialEq)]
+enum BalanceState {
+    Finished,
+    UnbalancedLeaf,
 }
 
 #[derive(Default, Debug)]
@@ -119,6 +133,7 @@ impl<K: Ord, V> Node<K, V> {
 
     fn insert_leaf(&mut self, kv: KeyValue<K, V>) -> Option<(KeyValue<K, V>, Node<K, V>)> {
         self.insert_kv(kv);
+
         if self.need_split() {
             let right_values = self.values.drain(RIGHT..).collect();
             let right_children = if self.children.len() > RIGHT {
@@ -137,6 +152,58 @@ impl<K: Ord, V> Node<K, V> {
             ))
         } else {
             None
+        }
+    }
+
+    fn remove<Q: ?Sized>(&mut self, key: &Q) -> (Option<V>, BalanceState)
+    where
+        K: Borrow<Q>,
+        Q: Ord,
+        K: std::fmt::Debug,
+        V: std::fmt::Debug,
+    {
+        match self
+            .values
+            .binary_search_by(|probe| key.cmp(probe.key.borrow()).reverse())
+        {
+            Ok(idx) => {
+                if self.is_leaf() {
+                    self.remove_leaf(idx)
+                } else {
+                    todo!()
+                }
+            }
+
+            Err(child_index) => {
+                if child_index < self.children.len() {
+                    dbg!(&self, child_index);
+
+                    let (value, state) = self.children[child_index].remove(key);
+
+                    match state {
+                        BalanceState::UnbalancedLeaf => {
+
+                        },
+                        BalanceState::Finished => {}
+                    }
+
+                    dbg!(&state, &value);
+
+                    (value, state)
+                } else {
+                    (None, BalanceState::Finished)
+                }
+            }
+        }
+    }
+
+    fn remove_leaf(&mut self, idx: usize) -> (Option<V>, BalanceState) {
+        self.values[idx..].rotate_left(1);
+
+        match self.values.pop() {
+            None => (None, BalanceState::Finished),
+            Some(x) if self.values.len() > MID => (Some(x.value), BalanceState::Finished),
+            Some(x) => (Some(x.value), BalanceState::UnbalancedLeaf),
         }
     }
 
@@ -164,7 +231,7 @@ impl<K: Ord, V> Node<K, V> {
 }
 
 #[test]
-fn test_insert() {
+fn test_basic() {
     let mut map = NaiveBTree::default();
 
     let kvs = vec![
@@ -189,4 +256,8 @@ fn test_insert() {
     }
 
     assert!(map.get(&11).is_none());
+
+    map.remove(&10);
+
+    dbg!(&map);
 }
